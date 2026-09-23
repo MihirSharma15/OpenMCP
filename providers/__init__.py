@@ -1,0 +1,1 @@
+"""Paid OpenMCP provider applications."""

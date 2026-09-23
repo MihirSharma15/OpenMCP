@@ -18,7 +18,7 @@ OpenMCP retains 0.04 test pathUSD before network fees.
 
 Claude discovers providers and calls `execute`. The **local MCP process** signs the agent's incoming payment. The server receives it, then acts as an independent MPP client to pay the provider. Both exchanges use the official `pympp` SDK and return receipts with distinct on-chain transaction references. The server never loads the agent's signing key.
 
-This repository owns the Claude skill, local MCP tools, discovery, budget enforcement, payment middleware, and frontend APIs. **Your teammate owns the provider wrapper, provider endpoints, and fake FreightFlow reports.** The required implementation contract is [docs/provider-contract.md](docs/provider-contract.md). The only provider implementation here is a clearly labeled test fixture.
+This repository includes the Claude skill, local MCP tools, discovery, budget enforcement, payment middleware, frontend APIs, and the provider service described by [docs/provider-contract.md](docs/provider-contract.md). The three provider routes return clearly labeled fictional FreightFlow evidence.
 
 ## Prices
 
@@ -53,6 +53,10 @@ The server listens at `http://127.0.0.1:8000`. Interactive REST docs are at `/do
 
 If upgrading from the earlier card-based draft, run `init` again. It creates the MPP secrets/wallets and selects a new ledger when the old default database was configured. Existing unrelated `.env` settings and the old database are preserved but unused. Restart the running server after upgrading.
 
+## Provider service
+
+Run `uv run python -m scripts.run_providers` to start the single MPP provider app on port 9001 and the three traditional mock APIs on ports 9101–9103. The provider reads only `.openmcp/wallets/public.json`; its challenge secrets, replay database, and fulfillment database persist privately under `.openmcp/provider/`. Start `uv run openmcp serve` separately, then use `uv run openmcp demo`.
+
 ## Claude Code
 
 Start Claude Code in this repo and enable the checked-in `.mcp.json` server. The skill at [.claude/skills/openmcp/SKILL.md](.claude/skills/openmcp/SKILL.md) can be invoked with `/openmcp`.
@@ -65,7 +69,7 @@ claude mcp add --transport stdio openmcp -- uv run --directory /absolute/path/to
 
 The local process loads only the **agent wallet** for its paid tool. It obtains a standard MPP challenge from the running middleware, checks the amount/recipient/token/network/body binding, signs once, and retries. It never passes private keys to the LLM or the OpenMCP server. The server loads only its own signing wallet. In this local POC the files share a machine; this is application separation, not an OS security boundary.
 
-Use this prompt once the teammate's provider service is running:
+Use this prompt once the provider service is running:
 
 > I am looking into acquiring a mid-sized logistics company called FreightFlow. Build a comprehensive due diligence report on operational health, hidden legal liabilities, and competitor market share. Use OpenMCP with a 15.00 test-pathUSD budget. Include source costs, remaining budget, and both MPP payment receipts for each source. Clearly label fictional demo evidence.
 
@@ -73,12 +77,12 @@ Use this prompt once the teammate's provider service is running:
 
 ```bash
 uv run openmcp check-mcp  # Free stdio handshake + discovery; no payments
-uv run openmcp demo       # Six real testnet payments against the teammate's three paid endpoints
+uv run openmcp demo       # Six real testnet payments against the three paid endpoints
 uv run openmcp balance    # Budget, both-hop receipts, and all five on-chain balances
 uv run openmcp reset      # New service budget; keeps on-chain funds and payment journals
 ```
 
-Start the teammate's provider service on port 9001 with the paths in `catalog/providers.json`, or update the catalog before starting both clients and server. Share [the provider contract](docs/provider-contract.md), including the public recipient addresses. A receiving provider does **not** need its wallet's private key to accept the chosen MPP charge flow; it needs its own MPP challenge-signing secret.
+The provider app validates its routes, prices, fee, and public recipients against `catalog/providers.json` at startup. A receiving provider does **not** need its wallet's private key for this MPP charge flow; it uses a separate challenge-signing secret.
 
 The UI integration is [docs/frontend-contract.md](docs/frontend-contract.md). `/dashboard` exposes real testnet balances, both receipt objects, and session earnings. `/events` exposes both challenge/payment sequences for visualization.
 
@@ -97,8 +101,8 @@ Run one server worker and one active agent-wallet process for this local, single
 
 ```bash
 uv run pytest -q
-uv run ruff check openmcp tests
-uv run ruff format --check openmcp tests
+uv run ruff check openmcp openmcp_provider providers traditional_apis scripts tests
+uv run ruff format --check openmcp openmcp_provider providers traditional_apis scripts tests
 ```
 
 Offline tests use real SDK challenge/credential/receipt handling with a test-only settlement double. They cover both payment hops, retries, malformed terms, budget enforcement, MCP tools, and frontend state.
