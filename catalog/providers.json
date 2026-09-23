@@ -1,0 +1,32 @@
+[
+  {
+    "id": "operational-health",
+    "name": "SupplySignal",
+    "description": "Supply chain and operational health: fleet utilization, delivery performance, customer concentration and cash conversion.",
+    "keywords": ["operations", "operational", "health", "supply", "logistics", "fleet", "delivery", "freightflow"],
+    "url": "http://127.0.0.1:9001/operational-health",
+    "price_cents": 40,
+    "wallet": "operations",
+    "input_schema": {"type": "object", "properties": {"company": {"type": "string", "minLength": 1}}, "required": ["company"], "additionalProperties": false}
+  },
+  {
+    "id": "legal-liabilities",
+    "name": "CourtLens",
+    "description": "Court filings and hidden legal liabilities: litigation, employment claims, regulatory exposure and contingent liabilities.",
+    "keywords": ["legal", "liabilities", "court", "litigation", "lawsuit", "regulatory", "hidden", "freightflow"],
+    "url": "http://127.0.0.1:9001/legal-liabilities",
+    "price_cents": 50,
+    "wallet": "legal",
+    "input_schema": {"type": "object", "properties": {"company": {"type": "string", "minLength": 1}}, "required": ["company"], "additionalProperties": false}
+  },
+  {
+    "id": "competitor-market-share",
+    "name": "MarketScope",
+    "description": "Competitor market share and positioning: regional market size, competitive concentration, pricing and growth.",
+    "keywords": ["competitor", "competitors", "market", "share", "competition", "growth", "pricing", "freightflow"],
+    "url": "http://127.0.0.1:9001/competitor-market-share",
+    "price_cents": 30,
+    "wallet": "market",
+    "input_schema": {"type": "object", "properties": {"company": {"type": "string", "minLength": 1}}, "required": ["company"], "additionalProperties": false}
+  }
+]
