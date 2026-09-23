@@ -57,6 +57,24 @@ If upgrading from the earlier card-based draft, run `init` again. It creates the
 
 Run `uv run python -m scripts.run_providers` to start the single MPP provider app on port 9001 and the three traditional mock APIs on ports 9101–9103. The provider reads only `.openmcp/wallets/public.json`; its challenge secrets, replay database, and fulfillment database persist privately under `.openmcp/provider/`. Start `uv run openmcp serve` separately, then use `uv run openmcp demo`.
 
+## Live frontend demo
+
+The `/demo` page makes real, valueless Tempo testnet purchases through a local wallet runner. Start the full Python stack in one terminal:
+
+```bash
+uv run python -m scripts.run_demo
+```
+
+Then start Next.js separately:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:3000/demo`. Run, Step, Pause, Reset, and Run again use the live gateway and provider service. The browser reaches the runner through the same-origin `/api/runner/*` rewrite; wallet keys, connection tokens, signed credentials, and serialized receipt headers stay in local Python processes.
+
 ## Claude Code
 
 Start Claude Code in this repo and enable the checked-in `.mcp.json` server. The skill at [.claude/skills/openmcp/SKILL.md](.claude/skills/openmcp/SKILL.md) can be invoked with `/openmcp`.
@@ -101,8 +119,8 @@ Run one server worker and one active agent-wallet process for this local, single
 
 ```bash
 uv run pytest -q
-uv run ruff check openmcp openmcp_provider providers traditional_apis scripts tests
-uv run ruff format --check openmcp openmcp_provider providers traditional_apis scripts tests
+uv run ruff check openmcp openmcp_provider providers traditional_apis demo_runner scripts tests
+uv run ruff format --check openmcp openmcp_provider providers traditional_apis demo_runner scripts tests
 ```
 
 Offline tests use real SDK challenge/credential/receipt handling with a test-only settlement double. They cover both payment hops, retries, malformed terms, budget enforcement, MCP tools, and frontend state.

@@ -2,37 +2,35 @@
 
 import os
 import signal
-import subprocess
 import sys
-import time
-from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from openmcp.config import CHAIN_ID
 from openmcp_provider import ProviderSettings, load_public_addresses
+from scripts.processes import (
+    ManagedProcess,
+    monitor_processes,
+    start_processes,
+    terminate_processes,
+    uvicorn_process,
+    wait_until_ready,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = PROJECT_ROOT / ".env"
 
 
-@dataclass(frozen=True, slots=True)
-class Server:
-    name: str
-    app: str
-    port: int
-
-
-SERVERS = (
-    Server("SupplySignal traditional API", "traditional_apis.supplysignal:app", 9101),
-    Server("CourtLens traditional API", "traditional_apis.courtlens:app", 9102),
-    Server("MarketScope traditional API", "traditional_apis.marketscope:app", 9103),
-    Server("MPP provider service", "providers.app:app", 9001),
+PROVIDER_PROCESSES = (
+    uvicorn_process("SupplySignal traditional API", "traditional_apis.supplysignal:app", 9101),
+    uvicorn_process("CourtLens traditional API", "traditional_apis.courtlens:app", 9102),
+    uvicorn_process("MarketScope traditional API", "traditional_apis.marketscope:app", 9103),
+    uvicorn_process("MPP provider service", "providers.app:app", 9001),
 )
 
 
-def _preflight() -> ProviderSettings:
+def provider_preflight() -> ProviderSettings:
     settings = ProviderSettings()
     addresses = load_public_addresses(settings.wallets)
     required = ("operations", "legal", "market")
@@ -46,27 +44,11 @@ def _preflight() -> ProviderSettings:
     return settings
 
 
-def _terminate(processes: list[tuple[Server, subprocess.Popen[bytes]]]) -> None:
-    for _, process in processes:
-        if process.poll() is None:
-            process.terminate()
-    for _, process in processes:
-        if process.poll() is not None:
-            continue
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-    for _, process in processes:
-        if process.poll() is None:
-            process.wait()
-
-
 def main() -> int:
     os.chdir(PROJECT_ROOT)
     load_dotenv(ENV_PATH, override=False)
     try:
-        _preflight()
+        provider_preflight()
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 1
@@ -81,47 +63,23 @@ def main() -> int:
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
 
-    processes: list[tuple[Server, subprocess.Popen[bytes]]] = []
+    processes: list[ManagedProcess] = []
     exit_code = 0
     try:
-        for server in SERVERS:
-            command = [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                server.app,
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(server.port),
-                "--workers",
-                "1",
-            ]
-            process = subprocess.Popen(
-                command,
-                cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
-                shell=False,
-            )
-            processes.append((server, process))
-            print(f"Started {server.name} on http://127.0.0.1:{server.port}")
-
-        print("All four provider-side servers started. Press Ctrl-C to stop.")
-        while not stopping:
-            for server, process in processes:
-                result = process.poll()
-                if result is not None:
-                    print(
-                        f"{server.name} exited unexpectedly with status {result}.",
-                        file=sys.stderr,
-                    )
-                    exit_code = result or 1
-                    stopping = True
-                    break
-            if not stopping:
-                time.sleep(0.25)
+        processes = start_processes(
+            PROVIDER_PROCESSES,
+            project_root=PROJECT_ROOT,
+            env=os.environ.copy(),
+        )
+        ready = wait_until_ready(processes, should_stop=lambda: stopping)
+        if ready:
+            print("All four provider-side servers are ready. Press Ctrl-C to stop.")
+            exit_code = monitor_processes(processes, should_stop=lambda: stopping)
+    except (OSError, RuntimeError) as exc:
+        print(f"Provider startup error: {exc}", file=sys.stderr)
+        exit_code = 1
     finally:
-        _terminate(processes)
+        terminate_processes(processes)
 
     return exit_code
 
