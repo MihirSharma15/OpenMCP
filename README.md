@@ -59,7 +59,7 @@ Run `uv run python -m scripts.run_providers` to start the single MPP provider ap
 
 ## Live frontend demo
 
-The `/demo` page makes real, valueless Tempo testnet purchases through a local wallet runner. Start the full Python stack in one terminal:
+The `/demo` page is an observer-only wallet view. It shows the active service budget, the agent's separate on-chain testnet balance, and recent purchases with both Tempo receipt links. Start the full Python stack in one terminal:
 
 ```bash
 uv run python -m scripts.run_demo
@@ -73,7 +73,9 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:3000/demo`. Run, Step, Pause, Reset, and Run again use the live gateway and provider service. The browser reaches the runner through the same-origin `/api/runner/*` rewrite; wallet keys, connection tokens, signed credentials, and serialized receipt headers stay in local Python processes.
+Open `http://127.0.0.1:3000/demo`. Type a positive USD session budget, then select **Apply**. The typed amount becomes the active session ceiling. Remaining balance falls as purchases settle; later `execute` calls cannot raise or replace that ceiling. Applying starts a new session and clears its transaction list; it does not reverse on-chain transfers.
+
+Make purchases through Claude Code or another MCP-compatible agent as described below. The page is safe to leave open while the agent buys: its local runner has only the gateway connection token, never loads a wallet or signs a payment, and exposes only sanitized dashboard/reset operations through the same-origin `/api/runner/*` rewrite.
 
 ## Claude Code
 
@@ -89,7 +91,7 @@ The local process loads only the **agent wallet** for its paid tool. It obtains 
 
 Use this prompt once the provider service is running:
 
-> I am looking into acquiring a mid-sized logistics company called FreightFlow. Build a comprehensive due diligence report on operational health, hidden legal liabilities, and competitor market share. Use OpenMCP with a 15.00 test-pathUSD budget. Include source costs, remaining budget, and both MPP payment receipts for each source. Clearly label fictional demo evidence.
+> I am looking into acquiring a mid-sized logistics company called FreightFlow. Build a comprehensive due diligence report on operational health, hidden legal liabilities, and competitor market share. Use the active OpenMCP session budget returned by `balance`; do not hardcode 1500 or override it. Include source costs, remaining budget, and both MPP payment receipts for each source. Clearly label fictional demo evidence.
 
 ## Rehearse and integrate
 

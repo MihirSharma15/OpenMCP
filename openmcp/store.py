@@ -84,9 +84,7 @@ class Store(Database):
         balance = self.balance()
         if request.session_id != balance["session_id"]:
             raise OpenMCPError("stale_session", "Session changed; call balance again.", 409)
-        if balance["spent_cents"] + balance["reserved_cents"] + provider["price_cents"] > min(
-            balance["budget_cents"], request.budget_cents
-        ):
+        if provider["price_cents"] > min(balance["remaining_cents"], request.budget_cents):
             raise OpenMCPError("insufficient_budget", "Purchase exceeds the session budget.", 409)
         row = {
             "id": uid("exec"),
@@ -137,17 +135,17 @@ class Store(Database):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             session = db.execute("SELECT * FROM mpp_sessions WHERE active=1").fetchone()
-            ceiling = min(session["budget"], budget)
+            remaining = session["budget"] - session["spent"] - session["reserved"]
             if session["id"] != row["session_id"]:
                 raise OpenMCPError("stale_session", "Session changed; rediscover.", 409)
-            if session["spent"] + session["reserved"] + row["price"] > ceiling:
+            if row["price"] > min(remaining, budget):
                 raise OpenMCPError(
                     "insufficient_budget", "Purchase exceeds the session budget.", 409
                 )
             row = {**row, "state": "payment_pending", "incoming_credential": authorization}
             db.execute(
-                "UPDATE mpp_sessions SET reserved=reserved+?,budget=? WHERE id=?",
-                (row["price"], ceiling, row["session_id"]),
+                "UPDATE mpp_sessions SET reserved=reserved+? WHERE id=?",
+                (row["price"], row["session_id"]),
             )
             self._save(db, row)
             self._event(db, row, "agent_payment_submitted", {"amount_cents": row["price"]})

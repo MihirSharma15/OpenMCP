@@ -9,7 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import CHAIN_ID, Settings
 from .engine import Engine
-from .models import DiscoverRequest, ExecuteRequest, OpenMCPError
+from .models import DiscoverRequest, ExecuteRequest, OpenMCPError, ResetRequest
 
 
 class BearerAuth:
@@ -126,9 +126,14 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None):
         return {"events": rows, "next_cursor": rows[-1]["id"] if rows else after}
 
     @app.post("/demo/reset")
-    async def reset():
+    async def reset(body: ResetRequest | None = None):
         async with engine.lock:
-            return engine.store.reset(settings.budget_cents)
+            requested = (
+                body.budget_cents
+                if body is not None and body.budget_cents is not None
+                else settings.budget_cents
+            )
+            return engine.store.reset(requested)
 
     original_openapi = app.openapi
 

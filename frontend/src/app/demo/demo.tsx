@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { NumberTicker } from "@/components/magicui/number-ticker";
+import {
+  clampBudgetCents,
+  DEFAULT_BUDGET_CENTS,
+  formatBudgetInput,
+  parseBudgetInput,
+} from "@/lib/budget";
 import {
   getDemoState,
   money,
@@ -11,74 +18,35 @@ import {
 } from "@/lib/demo";
 import {
   type DemoError,
-  discoverServices,
   fetchRunnerState,
-  pauseRun,
   resetDemo,
   RunnerApiError,
-  type RunnerJob,
   type RunnerState,
-  startRun,
+  type WalletBalance,
 } from "@/lib/openmcp";
-
-function mergeState(
-  previous: RunnerState | null,
-  next: RunnerState,
-  includedChain: boolean,
-): RunnerState {
-  if (!previous || previous.dashboard.agent.session_id !== next.dashboard.agent.session_id) {
-    return next;
-  }
-  const eventMap = new Map(
-    [...previous.events, ...next.events].map(event => [event.id, event]),
-  );
-  const dashboard = includedChain
-    ? next.dashboard
-    : {
-        ...next.dashboard,
-        agent: {
-          ...next.dashboard.agent,
-          wallet_balance: previous.dashboard.agent.wallet_balance,
-        },
-        platform: {
-          ...next.dashboard.platform,
-          wallet_balance: previous.dashboard.platform.wallet_balance,
-        },
-        providers: next.dashboard.providers.map(provider => ({
-          ...provider,
-          wallet_balance: previous.dashboard.providers.find(
-            previousProvider => previousProvider.endpoint_id === provider.endpoint_id,
-          )?.wallet_balance,
-        })),
-      };
-  return {
-    ...next,
-    dashboard,
-    events: [...eventMap.values()].sort((left, right) => left.id - right.id).slice(-100),
-  };
-}
 
 function errorDetail(error: unknown): DemoError {
   if (error instanceof RunnerApiError) return error.detail;
   return {
     code: "demo_action_failed",
-    message: "The local demo action failed. Retry it without changing the session.",
+    message: "The budget change failed. Retry without changing the active session.",
     retryable: true,
   };
 }
 
 export default function Demo() {
   const [runnerState, setRunnerState] = useState<RunnerState | null>(null);
+  const [walletBalance, setWalletBalance] = useState<WalletBalance | undefined>();
+  const [budgetInput, setBudgetInput] = useState(formatBudgetInput(DEFAULT_BUDGET_CENTS));
+  const [budgetInputError, setBudgetInputError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<DemoError | null>(null);
   const [actionError, setActionError] = useState<DemoError | null>(null);
-  const [busy, setBusy] = useState<"run" | "step" | "pause" | "reset" | null>(null);
-  const cursorRef = useRef(0);
+  const [applying, setApplying] = useState(false);
   const sessionRef = useRef<string | null>(null);
+  const budgetSessionRef = useRef<string | null>(null);
   const nextChainPollRef = useRef(0);
-  const autoDiscoveryRef = useRef<string | null>(null);
+  const generationRef = useRef(0);
   const state = getDemoState(runnerState);
-  const job = runnerState?.job;
-  const running = job?.status === "running" || job?.status === "pausing";
 
   useEffect(() => {
     let active = true;
@@ -87,23 +55,32 @@ export default function Demo() {
 
     async function poll() {
       const includeChain = Date.now() >= nextChainPollRef.current;
+      const generation = generationRef.current;
       controller = new AbortController();
+
       try {
-        const next = await fetchRunnerState(
-          cursorRef.current,
-          includeChain,
-          controller.signal,
-        );
-        if (!active) return;
+        const next = await fetchRunnerState(includeChain, controller.signal);
+        if (!active || generation !== generationRef.current) return;
+
         const sessionId = next.dashboard.agent.session_id;
-        if (sessionRef.current && sessionRef.current !== sessionId) {
-          autoDiscoveryRef.current = null;
+        if (sessionRef.current !== null && sessionRef.current !== sessionId) {
+          setWalletBalance(undefined);
           nextChainPollRef.current = 0;
         }
         sessionRef.current = sessionId;
-        cursorRef.current = next.next_cursor;
-        if (includeChain) nextChainPollRef.current = Date.now() + 5000;
-        setRunnerState(previous => mergeState(previous, next, includeChain));
+
+        if (includeChain) {
+          setWalletBalance(next.dashboard.agent.wallet_balance);
+          nextChainPollRef.current = Date.now() + 5000;
+        }
+        if (budgetSessionRef.current !== sessionId) {
+          const nextBudget = clampBudgetCents(next.dashboard.agent.budget_cents);
+          setBudgetInput(formatBudgetInput(nextBudget));
+          setBudgetInputError(null);
+          budgetSessionRef.current = sessionId;
+        }
+
+        setRunnerState(next);
         setPollError(null);
       } catch (error) {
         if (!active || (error instanceof DOMException && error.name === "AbortError")) return;
@@ -121,261 +98,265 @@ export default function Demo() {
     };
   }, []);
 
-  useEffect(() => {
-    const sessionId = runnerState?.dashboard.agent.session_id;
-    if (
-      !sessionId ||
-      runnerState.discovery ||
-      runnerState.dashboard.transactions.length === 0 ||
-      autoDiscoveryRef.current === sessionId
-    ) {
-      return;
-    }
-    autoDiscoveryRef.current = sessionId;
-    void discoverServices()
-      .then(discovery => {
-        setRunnerState(previous =>
-          previous?.dashboard.agent.session_id === discovery.session_id
-            ? { ...previous, discovery }
-            : previous,
-        );
-      })
-      .catch(error => setActionError(errorDetail(error)));
-  }, [runnerState]);
-
-  function updateJob(nextJob: RunnerJob) {
-    setRunnerState(previous => (previous ? { ...previous, job: nextJob } : previous));
-  }
-
-  function clearSessionView() {
-    setRunnerState(null);
-    cursorRef.current = 0;
-    sessionRef.current = null;
-    nextChainPollRef.current = 0;
-    autoDiscoveryRef.current = null;
-  }
-
-  async function run() {
+  async function applyBudget(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setActionError(null);
-    if (running) {
-      setBusy("pause");
-      try {
-        updateJob((await pauseRun()).job);
-      } catch (error) {
-        setActionError(errorDetail(error));
-      } finally {
-        setBusy(null);
-      }
+
+    const parsed = parseBudgetInput(budgetInput);
+    if (!parsed.valid) {
+      setBudgetInputError(parsed.message);
       return;
     }
 
-    setBusy("run");
+    setApplying(true);
+
     try {
-      if (state.complete) {
-        await resetDemo();
-        clearSessionView();
-      }
-      updateJob((await startRun("all")).job);
+      const nextSession = await resetDemo(parsed.cents);
+      generationRef.current += 1;
+      sessionRef.current = nextSession.session_id;
+      budgetSessionRef.current = nextSession.session_id;
+      nextChainPollRef.current = 0;
+      const nextBudget = clampBudgetCents(nextSession.budget_cents);
+      setBudgetInput(formatBudgetInput(nextBudget));
+      setBudgetInputError(null);
+      setWalletBalance(undefined);
+      setRunnerState(previous =>
+        previous
+          ? {
+              dashboard: {
+                ...previous.dashboard,
+                agent: {
+                  ...previous.dashboard.agent,
+                  ...nextSession,
+                  wallet_balance: undefined,
+                },
+                transactions: [],
+              },
+            }
+          : previous,
+      );
     } catch (error) {
       setActionError(errorDetail(error));
     } finally {
-      setBusy(null);
+      setApplying(false);
     }
   }
 
-  async function reset() {
-    setActionError(null);
-    setBusy("reset");
-    try {
-      await resetDemo();
-      clearSessionView();
-    } catch (error) {
-      setActionError(errorDetail(error));
-    } finally {
-      setBusy(null);
+  function updateBudgetFromInput(value: string) {
+    setBudgetInput(value);
+    const parsed = parseBudgetInput(value);
+    if (!parsed.valid) {
+      setBudgetInputError(parsed.message);
+      return;
+    }
+    setBudgetInputError(null);
+  }
+
+  function normalizeBudgetInput() {
+    const parsed = parseBudgetInput(budgetInput);
+    if (parsed.valid) {
+      setBudgetInput(parsed.formatted);
     }
   }
 
-  async function stepOnce() {
-    setActionError(null);
-    setBusy("step");
-    try {
-      if (!runnerState?.discovery && runnerState?.dashboard.transactions.length === 0) {
-        const discovery = await discoverServices();
-        setRunnerState(previous => (previous ? { ...previous, discovery } : previous));
-      } else {
-        updateJob((await startRun("next")).job);
-      }
-    } catch (error) {
-      setActionError(errorDetail(error));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const runLabel =
-    job?.status === "pausing"
-      ? "Pausing…"
-      : running
-        ? "Pause"
-        : state.complete
-          ? "Run again"
-          : state.pending
-            ? "Resume"
-            : "Run";
   const visibleError = actionError ?? pollError;
   const offline =
+    (pollError !== null && actionError === null) ||
     visibleError?.code === "runner_offline" ||
     visibleError?.code === "runner_unavailable" ||
     visibleError?.code === "gateway_unavailable";
-  const budgetPercent =
-    state.budget > 0 ? Math.max(0, Math.min(100, (state.remaining / state.budget) * 100)) : 0;
-  const deliveredCount = state.rows.filter(row => row.delivered).length;
 
   return (
     <div className="demo-page">
-      <a href="#demo-main" className="skip-link">Skip to content</a>
+      <a href="#demo-main" className="skip-link">
+        Skip to content
+      </a>
       <header className="demo-header">
         <div className="demo-brand">
           <Link href="/" className="demo-wordmark">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 18V9a7 7 0 0 1 14 0v9" stroke="#161514" strokeWidth="1.6" /><path d="M8 18v-6a2 2 0 0 1 4 0v6" stroke="#6259A6" strokeWidth="1.6" /></svg>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M3 18V9a7 7 0 0 1 14 0v9" stroke="#161514" strokeWidth="1.6" />
+              <path d="M8 18v-6a2 2 0 0 1 4 0v6" stroke="#6259A6" strokeWidth="1.6" />
+            </svg>
             <span>OpenMCP</span>
           </Link>
           <span className="header-divider" />
-          <span className="demo-subtitle">FreightFlow due diligence</span>
-        </div>
-        <div className="demo-controls">
-          <span className="test-mode" title="Real MPP transfers using valueless Tempo Moderato test tokens.">Tempo testnet · valueless tokens</span>
-          <button type="button" className="reset-button" onClick={reset} disabled={running || busy !== null}>Reset</button>
-          <button type="button" className="step-button" onClick={stepOnce} disabled={!runnerState || state.complete || running || busy !== null}>Step</button>
-          <button type="button" className="button run-button" onClick={run} disabled={!runnerState || busy !== null || job?.status === "pausing"}>{runLabel}</button>
+          <span className="demo-subtitle">Wallet observer</span>
         </div>
       </header>
 
       <main id="demo-main" className="demo-grid">
         {visibleError && (
-          <section className={`demo-banner ${offline ? "offline-banner" : "error-banner"}`} role="alert">
-            <strong>{offline ? "Local demo stack offline" : "Demo action failed"}</strong>
+          <section
+            className={`demo-banner ${offline ? "offline-banner" : "error-banner"}`}
+            role="alert"
+          >
+            <strong>{offline ? "Local demo stack offline" : "Budget change failed"}</strong>
             <span>{visibleError.message}</span>
             {offline && <code>uv run python -m scripts.run_demo</code>}
           </section>
         )}
-        {job?.last_error && (
-          <section className="demo-banner error-banner" role="alert">
-            <strong>Purchase needs attention</strong>
-            <span>{job.last_error.message}</span>
-            <span>{job.last_error.retryable ? "Run resumes the same idempotent request." : "Resolve the gateway error before retrying."}</span>
-          </section>
-        )}
-        {state.pending && !job?.last_error && (
-          <section className="demo-banner pending-banner" role="status">
-            <strong>Purchase pending</strong>
-            <span>Run will resume {state.pending.provider} with the same payment credential and idempotency key—no second payment is created.</span>
-          </section>
-        )}
-        <section aria-label="Task" className="panel task-panel">
-          <div className="task-caption"><span>Task</span><span className="mono" title={state.agent?.address}>agent wallet · {shortAddress(state.agent?.address)}</span></div>
-          <p>“I am looking into acquiring a mid-sized logistics company called FreightFlow. Build a comprehensive due diligence report on their operational health, hidden legal liabilities, and competitor market share. Here is a 15.00 test-pathUSD OpenMCP budget.”</p>
-        </section>
 
-        <section aria-label="Budget" className="panel budget-panel">
-          <div className="budget-label">Service budget remaining · test pathUSD</div>
-          <div className="budget-amount"><span>{state.agent ? money(state.remaining) : "—"}</span><span className="muted">of {state.agent ? money(state.budget) : "—"}</span></div>
-          <div className="budget-track" role="progressbar" aria-label="Service budget remaining" aria-valuenow={state.remaining / 100} aria-valuemin={0} aria-valuemax={state.budget / 100 || 15}><div style={{ width: `${budgetPercent}%` }} /></div>
-          <div className="budget-summary"><span>Spent {money(state.spent)} · reserved {money(state.reserved)}</span><span>{state.ledger.length} {state.ledger.length === 1 ? "execution" : "executions"}</span></div>
-        </section>
-
-        <section aria-label="Current action" className="panel action-panel">
-          <div className="stages">
-            {["Discover", "Purchase", "Receive", "Report"].map((label, index) => (
-              <div key={label} className={`stage ${index === state.stageIndex ? "is-active" : index < state.stageIndex || state.complete ? "is-done" : ""}`} aria-current={index === state.stageIndex ? "step" : undefined}>
-                <div className="stage-bar" /><div className="stage-label"><span className="stage-dot" /><span>{label}</span></div>
+        <section aria-labelledby="balance-heading" className="panel balance-panel">
+          <div className="panel-heading">
+            <h1 id="balance-heading">Balance</h1>
+          </div>
+          <div className="balance-body">
+            <div className="balance-amount">
+              {state.agent ? (
+                <NumberTicker
+                  value={state.remaining / 100}
+                  startValue={state.remaining / 100}
+                  decimalPlaces={2}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label={`${money(state.remaining)} USD remaining`}
+                />
+              ) : (
+                <span aria-label="Remaining budget loading">—</span>
+              )}
+              <small aria-hidden={Boolean(state.agent)}>USD remaining</small>
+            </div>
+            <dl className="balance-summary">
+              <div>
+                <dt>Budget</dt>
+                <dd>{state.agent ? money(state.budget) : "—"}</dd>
               </div>
-            ))}
-          </div>
-          <div className="current-action" aria-live="polite" aria-atomic="true">
-            <div className="action-heading"><span>{state.actionTitle}</span><span className={state.discovered ? "accent" : "muted"}>{state.actionTag}</span></div>
-            <div className="action-code">{state.actionCode}</div>
-          </div>
-        </section>
-
-        <section aria-label="Services" className="panel services-panel">
-          <div className="panel-heading"><h2>Services</h2><span className="mono">from /discover</span></div>
-          <div className="table-scroll" role="region" aria-label="Available services" tabIndex={0}>
-            <div role="table" aria-label="Service quotes" className="services-table">
-              <div role="row" className="service-columns table-heading"><span role="columnheader">Service</span><span role="columnheader">Provider</span><span role="columnheader">Endpoint</span><span role="columnheader" className="align-right">Price</span><span role="columnheader">Status</span></div>
-              {state.discovered && state.rows.map(service => (
-                <div role="row" key={service.id} className={`service-columns service-row ${service.active ? "active-row" : ""}`}>
-                  <span role="cell">{service.name}</span><span role="cell" className="muted">{service.provider}</span><span role="cell" className="mono endpoint-path">{service.endpoint}</span><span role="cell" className="align-right">{money(service.price)}</span><span role="cell"><span className={`status status-${service.status.toLowerCase()}`}>{service.status}</span></span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {state.discovered ? <div className="quoted-total"><span>Quoted total · test pathUSD</span><span>{money(state.quotedTotal)}</span></div> : <div className="empty-state">Services appear after free live discovery.</div>}
-        </section>
-
-        <section aria-label="Balances" className="panel balances-panel">
-          <div className="panel-heading"><h2>On-chain balances</h2><span>Tempo Moderato testnet</span></div>
-          <div className="agent-balance">
-            <span><span>Agent wallet</span><small>Separate from service budget</small></span>
-            {state.agent?.wallet_balance?.explorer_url ? <a href={state.agent.wallet_balance.explorer_url} target="_blank" rel="noreferrer">{walletAmount(state.agent.wallet_balance)}</a> : <span>{walletAmount(state.agent?.wallet_balance)}</span>}
-          </div>
-          <div className="earnings-label">Provider earnings this session · on-chain wallet</div>
-          {state.providers.map(provider => (
-            <div key={provider.endpoint_id} className="provider-balance">
-              <span><span>{provider.name}</span><small>+{money(provider.session_earned_cents)} test pathUSD</small></span>
-              {provider.wallet_balance?.explorer_url ? <a href={provider.wallet_balance.explorer_url} target="_blank" rel="noreferrer">{walletAmount(provider.wallet_balance)}</a> : <span>{walletAmount(provider.wallet_balance)}</span>}
-            </div>
-          ))}
-          <div className="platform-wallet"><span>OpenMCP wallet</span><span>{walletAmount(state.platform?.wallet_balance)}</span></div>
-          <div className="platform-fees"><span>OpenMCP gross fees{state.feeRate === null ? "" : ` · ${state.feeRate}%`}</span><span>{money(state.fees)} test pathUSD</span></div>
-        </section>
-
-        <section aria-label="Payment record" className="panel ledger-panel">
-          <div className="panel-heading"><h2>Payment record</h2><span className="mono">two MPP receipts per purchase</span></div>
-          <div className="table-scroll ledger-scroll" role="region" aria-label="Payment details" tabIndex={0}>
-            <div role="table" aria-label="Payment ledger" className="ledger-table">
-              <div role="row" className="ledger-columns table-heading"><span role="columnheader">Request</span><span role="columnheader">Service</span><span role="columnheader" className="align-right">Charged</span><span role="columnheader" className="align-right">Provider</span><span role="columnheader" className="align-right">Fee</span></div>
-              {state.ledger.map(row => (
-                <div role="row" key={row.id} className={`ledger-columns ledger-row ${row.fresh ? "fresh-payment" : ""}`}>
-                  <span role="cell" className="receipt-cell">
-                    <span className="mono request-id" title={row.id}>{row.req}</span>
-                    {row.incoming ? <a href={row.incoming.url} target="_blank" rel="noreferrer" title={row.incoming.reference}>Claude → OpenMCP · {shortReference(row.incoming.reference)}</a> : <span className="receipt-pending">Claude receipt pending</span>}
-                    {row.outgoing ? <a href={row.outgoing.url} target="_blank" rel="noreferrer" title={row.outgoing.reference}>OpenMCP → provider · {shortReference(row.outgoing.reference)}</a> : <span className="receipt-pending">Provider receipt pending</span>}
-                  </span>
-                  <span role="cell"><span>{row.name}</span><small>{row.status.replaceAll("_", " ")}</small></span>
-                  <span role="cell" className="align-right">{row.price === null ? "Pending" : money(row.price)}</span>
-                  <span role="cell" className="align-right">{row.earned === null ? "Pending" : money(row.earned)}</span>
-                  <span role="cell" className="align-right muted">{row.fee === null ? "Pending" : money(row.fee)}</span>
-                </div>
-              ))}
-            </div>
-            {state.ledger.length === 0 && <div className="empty-state">No payments yet. Verified testnet receipts appear here as each purchase settles.</div>}
-            <div className="ledger-columns ledger-total"><span /><span className="muted">Total · test pathUSD</span><span className="align-right">{money(state.spent)}</span><span className="align-right">{money(state.providers.reduce((sum, provider) => sum + provider.session_earned_cents, 0))}</span><span className="align-right muted">{money(state.fees)}</span></div>
-          </div>
-        </section>
-
-        <section aria-label="Report" className="panel report-panel">
-          <div className="panel-heading"><h2>Report</h2><span>{state.complete ? "Complete" : `${deliveredCount} of ${state.rows.length || 3} sections`} · fictional evidence</span></div>
-          <div className="report-body">
-            {state.rows.map(report => (
-              <div key={report.id} className="report-section">
-                <div className="report-heading"><h3 className={report.delivered ? "" : "pending-title"}>{report.name}</h3><span>{report.delivered ? report.provider : "Pending"}</span></div>
-                {report.delivered ? (
-                  <>
-                    {report.isDemoData && <span className="fictional-label">Fictional demo data</span>}
-                    <p>{report.text ?? "Provider returned no narrative content."}</p>
-                    {report.sources.length > 0 && (
-                      <ul className="source-list" aria-label={`${report.name} sources`}>
-                        {report.sources.map((source, index) => <li key={source.id ?? `${report.id}-${index}`}><span>{source.title ?? source.id ?? "Provider source"}</span>{source.publisher && <small>{source.publisher}</small>}</li>)}
-                      </ul>
-                    )}
-                  </>
-                ) : <div className="report-placeholder" aria-label="Awaiting service data"><span /><span /></div>}
+              <div>
+                <dt>Spent</dt>
+                <dd>{state.agent ? money(state.spent) : "—"}</dd>
               </div>
-            ))}
-            {!state.discovered && <div className="empty-state report-empty">Live provider sections appear after discovery.</div>}
-            {state.complete && <div className="recommendation"><span>Completion summary</span><p>All three fictional provider reports arrived with two verified Tempo testnet payment receipts per source.</p></div>}
+            </dl>
+          </div>
+          <div className="wallet-line">
+            <span>
+              <strong>On-chain wallet balance</strong>
+              <small>
+                Agent wallet ·{" "}
+                <span className="mono" title={state.agent?.address}>
+                  {shortAddress(state.agent?.address)}
+                </span>
+              </small>
+            </span>
+            {walletBalance?.explorer_url ? (
+              <a href={walletBalance.explorer_url} target="_blank" rel="noreferrer">
+                {walletAmount(walletBalance)}
+              </a>
+            ) : (
+              <span>{walletAmount(walletBalance)}</span>
+            )}
+          </div>
+        </section>
+
+        <section aria-labelledby="budget-heading" className="panel budget-control-panel">
+          <div className="panel-heading">
+            <h2 id="budget-heading">Session budget</h2>
+          </div>
+          <form className="budget-form" onSubmit={applyBudget}>
+            <div className="budget-input-row">
+              <label htmlFor="budget-amount">Amount</label>
+              <div className={`budget-input-shell ${budgetInputError ? "has-error" : ""}`}>
+                <span aria-hidden="true">$</span>
+                <input
+                  id="budget-amount"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={budgetInput}
+                  onChange={event => updateBudgetFromInput(event.target.value)}
+                  onBlur={normalizeBudgetInput}
+                  disabled={!runnerState || applying}
+                  aria-invalid={Boolean(budgetInputError)}
+                  aria-describedby={budgetInputError ? "budget-input-error" : undefined}
+                  aria-label="Session budget in USD"
+                />
+                <span>USD</span>
+              </div>
+            </div>
+            {budgetInputError && (
+              <p id="budget-input-error" className="budget-input-error" role="alert">
+                {budgetInputError}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="button apply-button"
+              disabled={!runnerState || applying || Boolean(budgetInputError)}
+            >
+              {applying ? "Applying…" : "Apply"}
+            </button>
+          </form>
+        </section>
+
+        <section aria-labelledby="transactions-heading" className="panel transactions-panel">
+          <div className="panel-heading">
+            <h2 id="transactions-heading">Recent transactions</h2>
+            <span>{state.rows.length} {state.rows.length === 1 ? "transaction" : "transactions"}</span>
+          </div>
+          <div className="table-scroll" role="region" aria-label="Recent transaction details" tabIndex={0}>
+            <table className="transactions-table">
+              <thead>
+                <tr>
+                  <th scope="col">Provider</th>
+                  <th scope="col">Endpoint / query type</th>
+                  <th scope="col" className="align-right">Price · USD</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Tempo receipts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.rows.map(row => (
+                  <tr key={row.id} className={row.fresh ? "fresh-payment" : undefined}>
+                    <td>{row.provider}</td>
+                    <td className="endpoint-cell">
+                      <span>{row.service}</span>
+                      <code>{row.endpointId}</code>
+                    </td>
+                    <td className="align-right">
+                      {row.charged === null ? "Pending" : money(row.charged)}
+                    </td>
+                    <td>
+                      <span className={`status status-${row.statusKey}`}>{row.status}</span>
+                    </td>
+                    <td className="receipt-cell">
+                      {row.incoming ? (
+                        <a
+                          href={row.incoming.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={row.incoming.reference}
+                        >
+                          Claude to OpenMCP · {shortReference(row.incoming.reference)}
+                        </a>
+                      ) : (
+                        <span>Claude receipt pending</span>
+                      )}
+                      {row.outgoing ? (
+                        <a
+                          href={row.outgoing.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={row.outgoing.reference}
+                        >
+                          OpenMCP to provider · {shortReference(row.outgoing.reference)}
+                        </a>
+                      ) : (
+                        <span>Provider receipt pending</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {state.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="empty-state">
+                      No session transactions yet. Purchases made by Claude appear here with their
+                      Tempo receipts.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
       </main>

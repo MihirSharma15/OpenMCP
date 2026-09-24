@@ -17,7 +17,10 @@ INSTRUCTIONS = """OpenMCP purchases evidence using real MPP payments on Tempo TE
 Your local execute tool holds the agent wallet and handles a 402 challenge, signs a payment
 credential, and retries the OpenMCP request. OpenMCP independently pays the provider via MPP.
 Read balance, discover relevant data within the user budget, then execute selected endpoints.
-Use integer cents (40 = 0.40 test pathUSD). budget_cents is the TOTAL session spending limit.
+Use integer cents (40 = 0.40 USD). Save budget_cents from balance — that is the user's
+chosen session ceiling, not a hardcoded 1500 — and pass that exact TOTAL to discover and
+every execute call. Never use a source price, remaining balance, or hardcoded default as
+budget_cents. remaining_cents falls automatically after each paid purchase.
 Use a fresh idempotency key per purchase and the IDENTICAL arguments/key for retries.
 Retry retryable errors at most twice. Never replace a rejected or pending payment with a new key.
 The budget excludes small testnet network fees; wallet balances and service spending are separate.
@@ -70,9 +73,11 @@ def create_mcp(settings: Settings | None = None, agent=None):
         """Pay from Claude's local wallet via MPP, then OpenMCP pays the provider via MPP.
 
         Requires an explicitly authorized user budget. Pass the quoted max_price_cents,
-        TOTAL budget_cents, schema-valid payload and active session_id. A new key is a new
-        purchase. Reuse the exact arguments/key after an interrupted call. Returns data,
-        agent_to_openmcp and openmcp_to_provider receipts with on-chain transaction references.
+        exact TOTAL budget_cents returned by balance (the user's session ceiling, not 1500),
+        schema-valid payload and active session_id. Never pass the source price or remaining
+        balance as budget_cents. A new key is a new purchase. Reuse the exact arguments/key
+        after an interrupted call. Returns data, agent_to_openmcp and openmcp_to_provider
+        receipts with on-chain transaction references.
         """
         return await call(
             agent.execute(

@@ -1,5 +1,4 @@
 export type ExecutionStatus = "quoted" | "payment_pending" | "provider_pending" | "completed";
-export type JobStatus = "idle" | "running" | "pausing";
 
 export interface DemoError {
   code: string;
@@ -20,8 +19,7 @@ export interface WalletBalance {
   error?: string;
 }
 
-export interface AgentDashboard {
-  address: string;
+export interface SessionBalance {
   session_id: string;
   currency: string;
   source: string;
@@ -29,20 +27,10 @@ export interface AgentDashboard {
   spent_cents: number;
   reserved_cents: number;
   remaining_cents: number;
-  wallet_balance?: WalletBalance;
 }
 
-export interface PlatformDashboard {
+export interface AgentDashboard extends SessionBalance {
   address: string;
-  session_gross_fee_cents: number;
-  wallet_balance?: WalletBalance;
-}
-
-export interface ProviderDashboard {
-  endpoint_id: string;
-  name: string;
-  address: string;
-  session_earned_cents: number;
   wallet_balance?: WalletBalance;
 }
 
@@ -55,25 +43,6 @@ export interface PublicReceipt {
   explorer_url?: string;
 }
 
-export interface ReportSource {
-  id?: string;
-  title?: string;
-  publisher?: string;
-  fictional?: boolean;
-  [key: string]: unknown;
-}
-
-export interface ProviderData {
-  company?: string;
-  provider?: string;
-  title?: string;
-  content?: string;
-  metrics?: Record<string, unknown>;
-  sources?: ReportSource[];
-  is_demo_data?: boolean;
-  [key: string]: unknown;
-}
-
 export interface Transaction {
   execution_id: string;
   session_id: string;
@@ -82,78 +51,21 @@ export interface Transaction {
   provider: string;
   currency: string;
   price_cents: number;
-  platform_fee_cents: number;
-  provider_amount_cents: number;
   agent_to_openmcp: PublicReceipt | null;
   openmcp_to_provider: PublicReceipt | null;
-  data: ProviderData | null;
   error: DemoError | null;
-  replayed: boolean;
-  payment_mode: string;
 }
 
 export interface Dashboard {
   agent: AgentDashboard;
-  platform: PlatformDashboard;
-  providers: ProviderDashboard[];
   transactions: Transaction[];
   payment_mode: string;
   currency: string;
   chain_id: number;
 }
 
-export interface DiscoveryEndpoint {
-  endpoint_id: string;
-  provider: string;
-  description: string;
-  price_cents: number;
-  provider_price_cents: number;
-  platform_fee_cents: number;
-  input_schema: Record<string, unknown>;
-  currency: string;
-  payment_protocol: string;
-  payment_method: string;
-  chain_id: number;
-  token_address: string;
-  execute_path: string;
-  pay_to: string;
-  provider_wallet: string;
-  affordable: boolean;
-  relevance: number;
-}
-
-export interface Discovery {
-  session_id: string;
-  query: string;
-  endpoints: DiscoveryEndpoint[];
-  total_price_cents: number;
-  remaining_cents: number;
-  payment_mode: string;
-  discovery_is_free: boolean;
-}
-
-export interface GatewayEvent {
-  id: number;
-  session_id: string;
-  execution_id: string | null;
-  type: string;
-  detail: Record<string, unknown>;
-  created: number;
-}
-
-export interface RunnerJob {
-  status: JobStatus;
-  mode: "all" | "next" | null;
-  current_endpoint: string | null;
-  last_error: DemoError | null;
-}
-
 export interface RunnerState {
   dashboard: Dashboard;
-  events: GatewayEvent[];
-  next_cursor: number;
-  discovery: Discovery | null;
-  job: RunnerJob;
 }
 
 export class RunnerApiError extends Error {
@@ -228,29 +140,15 @@ function mutate<T>(path: string, body: Record<string, unknown> = {}): Promise<T>
 }
 
 export function fetchRunnerState(
-  after: number,
   includeChain: boolean,
   signal?: AbortSignal,
 ): Promise<RunnerState> {
   const query = new URLSearchParams({
-    after: String(after),
     chain: includeChain ? "1" : "0",
   });
   return request<RunnerState>(`/state?${query}`, { signal });
 }
 
-export function discoverServices(): Promise<Discovery> {
-  return mutate<Discovery>("/discover");
-}
-
-export function startRun(mode: "all" | "next"): Promise<{ job: RunnerJob }> {
-  return mutate<{ job: RunnerJob }>("/run", { mode });
-}
-
-export function pauseRun(): Promise<{ job: RunnerJob }> {
-  return mutate<{ job: RunnerJob }>("/pause");
-}
-
-export function resetDemo(): Promise<AgentDashboard> {
-  return mutate<AgentDashboard>("/reset");
+export function resetDemo(budgetCents: number): Promise<SessionBalance> {
+  return mutate<SessionBalance>("/reset", { budget_cents: budgetCents });
 }

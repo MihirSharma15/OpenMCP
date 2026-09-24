@@ -19,6 +19,11 @@ class ExecuteRequest(BaseModel):
     budget_cents: int = Field(ge=0, strict=True)
 
 
+class ResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    budget_cents: int | None = Field(default=None, ge=1, strict=True)
+
+
 class OpenMCPError(Exception):
     def __init__(self, code: str, message: str, status: int = 400, retryable: bool = False):
         self.code = code

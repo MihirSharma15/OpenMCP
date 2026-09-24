@@ -62,7 +62,7 @@ class Agent:
             scope=request.session_id,
             recipient=self.settings.addresses()["openmcp"],
             cents=provider.price_cents,
-            budget=min(request.budget_cents, self.settings.budget_cents),
+            budget=request.budget_cents,
             memo=memo_for(fingerprint),
             headers=self.headers,
         )

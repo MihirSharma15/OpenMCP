@@ -69,11 +69,78 @@ async def test_concurrent_retries_do_not_create_another_payment(system):
     assert system["providers"].calls == 1
 
 
-async def test_budget_ceiling_is_enforced_and_cannot_be_raised(system):
+async def test_execute_budget_does_not_shrink_session_ceiling(system):
     await system["agent"].execute(purchase(system, "legal-liabilities", budget=50))
+    balance = system["engine"].store.balance()
+    assert balance["budget_cents"] == 1500
+    assert balance["spent_cents"] == 50
+    assert balance["remaining_cents"] == 1450
+
+    result = await system["agent"].execute(purchase(system, key="purchase-0002", budget=1500))
+    assert result["status"] == "completed"
+    assert system["engine"].store.balance()["budget_cents"] == 1500
+    assert system["engine"].store.balance()["remaining_cents"] == 1410
+    assert system["chain"].broadcasts == 4
+
+
+async def test_session_budget_from_reset_caps_purchases_as_remaining_falls(system):
+    Agent.result(await system["agent"].http.post("/demo/reset", json={"budget_cents": 70}))
+
+    await system["agent"].execute(purchase(system, "legal-liabilities", budget=50))
+    balance = system["engine"].store.balance()
+    assert balance["budget_cents"] == 70
+    assert balance["spent_cents"] == 50
+    assert balance["remaining_cents"] == 20
+
     with pytest.raises(OpenMCPError, match="budget"):
         await system["agent"].execute(purchase(system, key="purchase-0002", budget=1500))
+    assert system["engine"].store.balance()["budget_cents"] == 70
     assert system["chain"].broadcasts == 2
+
+
+async def test_gateway_reset_sets_positive_budget_and_defaults(system):
+    original_session = system["engine"].store.balance()["session_id"]
+
+    reduced = Agent.result(
+        await system["agent"].http.post("/demo/reset", json={"budget_cents": 500})
+    )
+    assert reduced["session_id"] != original_session
+    assert reduced["budget_cents"] == 500
+
+    raised = Agent.result(
+        await system["agent"].http.post("/demo/reset", json={"budget_cents": 50_000})
+    )
+    assert raised["budget_cents"] == 50_000
+
+    Agent.result(await system["agent"].http.post("/demo/reset", json={"budget_cents": 400}))
+    defaulted = Agent.result(await system["agent"].http.post("/demo/reset"))
+    assert defaulted["budget_cents"] == system["settings"].budget_cents
+
+    Agent.result(await system["agent"].http.post("/demo/reset", json={"budget_cents": 350}))
+    explicit_null = Agent.result(
+        await system["agent"].http.post("/demo/reset", json={"budget_cents": None})
+    )
+    assert explicit_null["budget_cents"] == system["settings"].budget_cents
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"budget_cents": -1},
+        {"budget_cents": 0},
+        {"budget_cents": 1.5},
+        {"budget_cents": "100"},
+        {"budget_cents": True},
+        {"budget_cents": 100, "unexpected": True},
+    ],
+)
+async def test_gateway_reset_rejects_invalid_budget(system, body):
+    session_id = system["engine"].store.balance()["session_id"]
+
+    response = await system["agent"].http.post("/demo/reset", json=body)
+
+    assert response.status_code == 422
+    assert system["engine"].store.balance()["session_id"] == session_id
 
 
 async def test_provider_failure_keeps_incoming_receipt_and_retries_without_repaying(system):

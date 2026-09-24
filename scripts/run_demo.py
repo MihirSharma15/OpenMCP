@@ -91,8 +91,8 @@ def main() -> int:
         print(f"Demo startup error: {exc}", file=sys.stderr)
         exit_code = 1
     finally:
-        # The runner can be finishing one bounded wallet request. Stop it first
-        # while the gateway/providers remain alive, then tear down upstreams.
+        # Stop the observer while the gateway/providers remain alive, then tear
+        # down the upstream processes.
         terminate_processes(processes, timeout=180)
 
     return exit_code
