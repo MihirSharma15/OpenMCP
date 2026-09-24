@@ -77,6 +77,8 @@ Open `http://127.0.0.1:3000/demo`. Type a positive USD session budget, then sele
 
 Make purchases through Claude Code or another MCP-compatible agent as described below. The page is safe to leave open while the agent buys: its local runner has only the gateway connection token, never loads a wallet or signs a payment, and exposes only sanitized dashboard/reset operations through the same-origin `/api/runner/*` rewrite.
 
+Open `http://127.0.0.1:3000/providers` for the provider workspace: historical earnings, incoming payments, service prices, and on-chain wallet balances. Switch providers, filter dates and payment status, inspect both-hop receipts, or export payment history as CSV. The dashboard automatically updates as the agent buys data. Earnings history survives demo resets; current-session earnings and on-chain balances are labeled separately. This local operator view uses the same Python stack and Tempo testnet payments as the demo.
+
 ## Claude Code
 
 Start Claude Code in this repo and enable the checked-in `.mcp.json` server. The skill at [.claude/skills/openmcp/SKILL.md](.claude/skills/openmcp/SKILL.md) can be invoked with `/openmcp`.
@@ -115,7 +117,7 @@ The UI integration is [docs/frontend-contract.md](docs/frontend-contract.md). `/
 - Completed executions replay the original data and both receipts. Pending executions block demo reset. Reset changes the spending allowance, not wallet balances or chain history.
 - MPP charges here are two separate on-chain operations. They are **not atomic**. If a provider fails after the agent pays, the execution stays pending; this POC does not silently refund, erase a payment, or create a new one. Retry with the same key and resolve any expired or ambiguous payment manually. Challenges expire after five minutes by default, so rehearse recovery promptly.
 
-Run one server worker and one active agent-wallet process for this local, single-agent demo. Multiple wallet processes could contend for transaction nonces. The built-in agent and server serialize each wallet's purchases. Network fees are excluded from the service budget. This POC does not include production custody, automatic refunds, a provider onboarding UI, or a frontend.
+Run one server worker and one active agent-wallet process for this local, single-agent demo. Multiple wallet processes could contend for transaction nonces. The built-in agent and server serialize each wallet's purchases. Network fees are excluded from the service budget. This POC does not include production custody, automatic refunds, a provider onboarding UI, or multi-tenant provider authentication.
 
 ## Verification
 

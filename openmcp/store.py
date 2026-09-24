@@ -53,6 +53,8 @@ class Store(Database):
                     id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL,
                     execution_id TEXT, type TEXT NOT NULL, detail TEXT NOT NULL, created REAL NOT NULL
                 );
+                CREATE INDEX IF NOT EXISTS mpp_execution_events
+                    ON mpp_events(execution_id, type, id);
             """)
             if not db.execute("SELECT id FROM mpp_sessions WHERE active=1").fetchone():
                 db.execute(
@@ -185,6 +187,27 @@ class Store(Database):
                 (self.balance()["session_id"], after),
             )
             return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
+
+    def provider_transactions(self):
+        """Historical ledger, including verified payments awaiting fulfillment."""
+        with self.connection() as db:
+            records = db.execute("""
+                SELECT x.doc, e.detail, e.created AS paid_at
+                FROM mpp_executions x
+                LEFT JOIN mpp_events e ON e.id = (
+                    SELECT MIN(id) FROM mpp_events
+                    WHERE execution_id = x.id AND type = 'provider_payment_confirmed'
+                )
+                ORDER BY x.rowid DESC
+            """)
+            rows = []
+            for record in records:
+                row = json.loads(record["doc"])
+                if record["detail"]:
+                    row["outgoing_receipt"] = json.loads(record["detail"]).get("receipt")
+                row["paid_at"] = record["paid_at"]
+                rows.append(row)
+            return rows
 
     def reset(self, budget_cents):
         with self.connection() as db:

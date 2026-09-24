@@ -183,6 +183,17 @@ export default function Demo() {
           <span className="header-divider" />
           <span className="demo-subtitle">Wallet observer</span>
         </div>
+        <div className="demo-controls">
+          <Link href="/providers" className="provider-dashboard-link">
+            Providers ↗
+          </Link>
+          <span
+            className="test-mode"
+            title="Real MPP transfers using valueless Tempo Moderato test tokens."
+          >
+            Tempo testnet · valueless tokens
+          </span>
+        </div>
       </header>
 
       <main id="demo-main" className="demo-grid">

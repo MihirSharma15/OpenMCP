@@ -268,6 +268,14 @@ def create_app(
     ):
         return await runtime(request).state(bool(chain))
 
+    @app.get("/providers")
+    async def providers(request: Request, chain: int = Query(default=0, ge=0, le=1)):
+        runner = runtime(request)
+        dashboard = await runner._gateway_json(
+            runner.http.get("/providers/dashboard", params={"include_chain": bool(chain)})
+        )
+        return JSONResponse(_public_value(dashboard), headers={"Cache-Control": "no-store"})
+
     @app.post("/reset")
     async def reset(request: Request, body: ResetRequest | None = None):
         return await runtime(request).reset(body.budget_cents if body is not None else None)

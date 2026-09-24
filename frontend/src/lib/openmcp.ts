@@ -34,6 +34,14 @@ export interface AgentDashboard extends SessionBalance {
   wallet_balance?: WalletBalance;
 }
 
+export interface ProviderDashboard {
+  endpoint_id: string;
+  name: string;
+  address: string;
+  session_earned_cents: number;
+  wallet_balance?: WalletBalance;
+}
+
 export interface PublicReceipt {
   method?: string;
   status?: string;
@@ -62,6 +70,42 @@ export interface Dashboard {
   payment_mode: string;
   currency: string;
   chain_id: number;
+}
+
+export interface ProviderService extends ProviderDashboard {
+  description: string;
+  endpoint_path: string;
+  price_cents: number;
+  provider_amount_cents: number;
+  platform_fee_cents: number;
+}
+
+export interface ProviderTransaction {
+  execution_id: string;
+  session_id: string;
+  status: ExecutionStatus;
+  endpoint_id: string;
+  provider: string;
+  currency: string;
+  price_cents: number;
+  platform_fee_cents: number;
+  provider_amount_cents: number;
+  agent_to_openmcp: PublicReceipt | null;
+  openmcp_to_provider: PublicReceipt | null;
+  error: DemoError | null;
+  replayed?: boolean;
+  payment_mode?: string;
+  created_at: number;
+  paid_at: number | null;
+}
+
+export interface ProviderOverview {
+  agent: AgentDashboard;
+  providers: ProviderService[];
+  transactions: ProviderTransaction[];
+  currency: string;
+  chain_id: number;
+  payment_mode: string;
 }
 
 export interface RunnerState {
@@ -147,6 +191,13 @@ export function fetchRunnerState(
     chain: includeChain ? "1" : "0",
   });
   return request<RunnerState>(`/state?${query}`, { signal });
+}
+
+export function fetchProviderOverview(
+  includeChain: boolean,
+  signal?: AbortSignal,
+): Promise<ProviderOverview> {
+  return request<ProviderOverview>(`/providers?chain=${includeChain ? "1" : "0"}`, { signal });
 }
 
 export function resetDemo(budgetCents: number): Promise<SessionBalance> {
