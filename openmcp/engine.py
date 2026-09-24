@@ -227,6 +227,52 @@ class Engine:
             "payment_mode": "mpp_tempo_testnet",
         }
 
+    async def provider_dashboard(self, include_chain=True):
+        dashboard = await self.dashboard(include_chain)
+        transactions = []
+        for row in self.store.provider_transactions():
+            transaction = self.receipt(row)
+            # Provider reporting does not need purchased evidence or serialized receipts.
+            transaction.pop("data")
+            for hop in ("agent_to_openmcp", "openmcp_to_provider"):
+                if transaction[hop]:
+                    transaction[hop] = {
+                        key: value for key, value in transaction[hop].items() if key != "header"
+                    }
+            transactions.append(
+                {**transaction, "created_at": row["created"], "paid_at": row["paid_at"]}
+            )
+        services = []
+        for entry in dashboard["providers"]:
+            provider = self.catalog[entry["endpoint_id"]]
+            fee = (provider.price_cents * self.settings.fee_bps + 5000) // 10000
+            services.append(
+                {
+                    **entry,
+                    "session_earned_cents": sum(
+                        transaction["provider_amount_cents"]
+                        for transaction in transactions
+                        if transaction["endpoint_id"] == provider.id
+                        and transaction["session_id"] == dashboard["agent"]["session_id"]
+                        and (transaction["openmcp_to_provider"] or {}).get("status") == "success"
+                        and (transaction["openmcp_to_provider"] or {}).get("reference")
+                    ),
+                    "description": provider.description,
+                    "endpoint_path": provider.url.path,
+                    "price_cents": provider.price_cents,
+                    "provider_amount_cents": provider.price_cents - fee,
+                    "platform_fee_cents": fee,
+                }
+            )
+        return {
+            "agent": dashboard["agent"],
+            "providers": services,
+            "transactions": transactions,
+            "currency": dashboard["currency"],
+            "chain_id": dashboard["chain_id"],
+            "payment_mode": dashboard["payment_mode"],
+        }
+
     async def dashboard(self, include_chain=True):
         rows = self.store.transactions()
         providers = [

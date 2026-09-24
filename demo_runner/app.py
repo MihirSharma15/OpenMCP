@@ -497,6 +497,14 @@ def create_app(settings: Settings | None = None, agent: Agent | None = None) -> 
     ):
         return await runtime(request).state(after, bool(chain))
 
+    @app.get("/providers")
+    async def providers(request: Request, chain: int = Query(default=0, ge=0, le=1)):
+        runner = runtime(request)
+        dashboard = await runner._gateway_json(
+            runner.agent.http.get("/providers/dashboard", params={"include_chain": bool(chain)})
+        )
+        return JSONResponse(_public_value(dashboard), headers={"Cache-Control": "no-store"})
+
     @app.post("/discover")
     async def discover(_body: EmptyBody, request: Request):
         return await runtime(request).discover()

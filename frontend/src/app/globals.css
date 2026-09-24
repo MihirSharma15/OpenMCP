@@ -34,6 +34,8 @@ section[id], div[id] { scroll-margin-top: 32px; }
 .muted { color: var(--muted); }
 .accent { color: var(--violet) !important; }
 .mono { font-family: var(--font-mono); }
+.number-ticker { position: relative; display: inline-block; font-variant-numeric: tabular-nums; }
+.number-ticker-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .eyebrow { font-size: 13px; line-height: 20px; color: var(--muted); }
 .container { width: min(1200px, calc(100% - 96px)); margin-left: auto; margin-right: auto; }
 .button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--ink); color: white; font-size: 15px; font-weight: 500; white-space: nowrap; transition: background-color 160ms ease; }
@@ -113,7 +115,7 @@ section[id], div[id] { scroll-margin-top: 32px; }
 @media (max-width: 600px) {
   .container { width: calc(100% - 40px); }
   .landing-nav { height: auto; min-height: 72px; flex-wrap: wrap; gap: 20px; padding: 20px 0; }
-  .nav-links { width: 100%; gap: 16px; justify-content: space-between; font-size: 12px; }
+  .nav-links { width: 100%; gap: 12px; justify-content: space-between; flex-wrap: wrap; font-size: 12px; }
   .nav-links .button { padding: 0 12px; font-size: 12px; }
   .hero { padding-top: 64px; gap: 20px; }
   .hero h1 { font-size: 42px; line-height: 48px; letter-spacing: -1px; }

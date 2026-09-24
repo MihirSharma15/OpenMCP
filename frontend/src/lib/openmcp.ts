@@ -122,6 +122,28 @@ export interface DiscoveryEndpoint {
   relevance: number;
 }
 
+export interface ProviderService extends ProviderDashboard {
+  description: string;
+  endpoint_path: string;
+  price_cents: number;
+  provider_amount_cents: number;
+  platform_fee_cents: number;
+}
+
+export interface ProviderTransaction extends Omit<Transaction, "data"> {
+  created_at: number;
+  paid_at: number | null;
+}
+
+export interface ProviderOverview {
+  agent: AgentDashboard;
+  providers: ProviderService[];
+  transactions: ProviderTransaction[];
+  currency: string;
+  chain_id: number;
+  payment_mode: string;
+}
+
 export interface Discovery {
   session_id: string;
   query: string;
@@ -237,6 +259,10 @@ export function fetchRunnerState(
     chain: includeChain ? "1" : "0",
   });
   return request<RunnerState>(`/state?${query}`, { signal });
+}
+
+export function fetchProviderOverview(includeChain: boolean, signal?: AbortSignal): Promise<ProviderOverview> {
+  return request<ProviderOverview>(`/providers?chain=${includeChain ? "1" : "0"}`, { signal });
 }
 
 export function discoverServices(): Promise<Discovery> {

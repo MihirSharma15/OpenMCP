@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { WalletTicker } from "@/components/ui/wallet-ticker";
 import {
   getDemoState,
   money,
   shortAddress,
   shortReference,
-  walletAmount,
 } from "@/lib/demo";
 import {
   type DemoError,
@@ -245,6 +246,7 @@ export default function Demo() {
           <span className="demo-subtitle">FreightFlow due diligence</span>
         </div>
         <div className="demo-controls">
+          <Link href="/providers" className="provider-dashboard-link">Providers ↗</Link>
           <span className="test-mode" title="Real MPP transfers using valueless Tempo Moderato test tokens.">Tempo testnet · valueless tokens</span>
           <button type="button" className="reset-button" onClick={reset} disabled={running || busy !== null}>Reset</button>
           <button type="button" className="step-button" onClick={stepOnce} disabled={!runnerState || state.complete || running || busy !== null}>Step</button>
@@ -280,9 +282,9 @@ export default function Demo() {
 
         <section aria-label="Budget" className="panel budget-panel">
           <div className="budget-label">Service budget remaining · test pathUSD</div>
-          <div className="budget-amount"><span>{state.agent ? money(state.remaining) : "—"}</span><span className="muted">of {state.agent ? money(state.budget) : "—"}</span></div>
+          <div className="budget-amount"><span>{state.agent ? <NumberTicker value={state.remaining / 100} decimalPlaces={2} /> : "—"}</span><span className="muted">of {state.agent ? money(state.budget) : "—"}</span></div>
           <div className="budget-track" role="progressbar" aria-label="Service budget remaining" aria-valuenow={state.remaining / 100} aria-valuemin={0} aria-valuemax={state.budget / 100 || 15}><div style={{ width: `${budgetPercent}%` }} /></div>
-          <div className="budget-summary"><span>Spent {money(state.spent)} · reserved {money(state.reserved)}</span><span>{state.ledger.length} {state.ledger.length === 1 ? "execution" : "executions"}</span></div>
+          <div className="budget-summary"><span>Spent <NumberTicker value={(state.spent) / 100} decimalPlaces={2} /> · reserved <NumberTicker value={(state.reserved) / 100} decimalPlaces={2} /></span><span>{state.ledger.length} {state.ledger.length === 1 ? "execution" : "executions"}</span></div>
         </section>
 
         <section aria-label="Current action" className="panel action-panel">
@@ -318,17 +320,17 @@ export default function Demo() {
           <div className="panel-heading"><h2>On-chain balances</h2><span>Tempo Moderato testnet</span></div>
           <div className="agent-balance">
             <span><span>Agent wallet</span><small>Separate from service budget</small></span>
-            {state.agent?.wallet_balance?.explorer_url ? <a href={state.agent.wallet_balance.explorer_url} target="_blank" rel="noreferrer">{walletAmount(state.agent.wallet_balance)}</a> : <span>{walletAmount(state.agent?.wallet_balance)}</span>}
+            {state.agent?.wallet_balance?.explorer_url ? <a href={state.agent.wallet_balance.explorer_url} target="_blank" rel="noreferrer"><WalletTicker balance={state.agent.wallet_balance} /></a> : <span><WalletTicker balance={state.agent?.wallet_balance} /></span>}
           </div>
           <div className="earnings-label">Provider earnings this session · on-chain wallet</div>
           {state.providers.map(provider => (
             <div key={provider.endpoint_id} className="provider-balance">
-              <span><span>{provider.name}</span><small>+{money(provider.session_earned_cents)} test pathUSD</small></span>
-              {provider.wallet_balance?.explorer_url ? <a href={provider.wallet_balance.explorer_url} target="_blank" rel="noreferrer">{walletAmount(provider.wallet_balance)}</a> : <span>{walletAmount(provider.wallet_balance)}</span>}
+              <span><span>{provider.name}</span><small>+<NumberTicker value={(provider.session_earned_cents) / 100} decimalPlaces={2} /> test pathUSD</small></span>
+              {provider.wallet_balance?.explorer_url ? <a href={provider.wallet_balance.explorer_url} target="_blank" rel="noreferrer"><WalletTicker balance={provider.wallet_balance} /></a> : <span><WalletTicker balance={provider.wallet_balance} /></span>}
             </div>
           ))}
-          <div className="platform-wallet"><span>OpenMCP wallet</span><span>{walletAmount(state.platform?.wallet_balance)}</span></div>
-          <div className="platform-fees"><span>OpenMCP gross fees{state.feeRate === null ? "" : ` · ${state.feeRate}%`}</span><span>{money(state.fees)} test pathUSD</span></div>
+          <div className="platform-wallet"><span>OpenMCP wallet</span><span><WalletTicker balance={state.platform?.wallet_balance} /></span></div>
+          <div className="platform-fees"><span>OpenMCP gross fees{state.feeRate === null ? "" : ` · ${state.feeRate}%`}</span><span><NumberTicker value={(state.fees) / 100} decimalPlaces={2} /> test pathUSD</span></div>
         </section>
 
         <section aria-label="Payment record" className="panel ledger-panel">
@@ -351,7 +353,7 @@ export default function Demo() {
               ))}
             </div>
             {state.ledger.length === 0 && <div className="empty-state">No payments yet. Verified testnet receipts appear here as each purchase settles.</div>}
-            <div className="ledger-columns ledger-total"><span /><span className="muted">Total · test pathUSD</span><span className="align-right">{money(state.spent)}</span><span className="align-right">{money(state.providers.reduce((sum, provider) => sum + provider.session_earned_cents, 0))}</span><span className="align-right muted">{money(state.fees)}</span></div>
+            <div className="ledger-columns ledger-total"><span /><span className="muted">Total · test pathUSD</span><span className="align-right"><NumberTicker value={(state.spent) / 100} decimalPlaces={2} /></span><span className="align-right"><NumberTicker value={(state.providers.reduce((sum, provider) => sum + provider.session_earned_cents, 0)) / 100} decimalPlaces={2} /></span><span className="align-right muted"><NumberTicker value={(state.fees) / 100} decimalPlaces={2} /></span></div>
           </div>
         </section>
 

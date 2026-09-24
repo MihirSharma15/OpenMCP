@@ -5,6 +5,7 @@
 .header-divider { width: 1px; height: 20px; background: var(--line); }
 .demo-subtitle { font-size: 14px; color: var(--muted); }
 .demo-controls { display: flex; align-items: center; gap: 12px; }
+.provider-dashboard-link { font-size: 12px; color: var(--violet); white-space: nowrap; }
 .test-mode { font-size: 12px; color: #4B4396; padding: 4px 10px; border: 1px solid #D8D4F4; border-radius: 999px; background: #F7F5FF; }
 .reset-button { height: 36px; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font-size: 14px; }
 .step-button { height: 36px; padding: 0 16px; border: 1px solid #D9D8D4; border-radius: 999px; background: white; color: var(--ink); font-size: 14px; }

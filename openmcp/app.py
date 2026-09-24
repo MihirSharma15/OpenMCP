@@ -120,6 +120,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None):
     async def transactions():
         return {"transactions": [engine.receipt(row) for row in engine.store.transactions()]}
 
+    @app.get("/providers/dashboard")
+    async def provider_dashboard(include_chain: bool = True):
+        return await engine.provider_dashboard(include_chain)
+
     @app.get("/events")
     async def events(after: int = Query(default=0, ge=0)):
         rows = engine.store.events(after)

@@ -12,11 +12,14 @@ The demo uses **MPP + Tempo testnet**, with no Stripe dependency. Show five wall
 | `POST /discover` | Search results, consumer/provider prices, both recipient addresses and payload schema |
 | `GET /dashboard?include_chain=false` | Cheap session earnings and transaction updates |
 | `GET /dashboard` | Same plus actual balances of all five wallets from Tempo RPC |
+| `GET /providers/dashboard?include_chain=false` | Historical provider ledger across all sessions, catalog prices, and current agent budget |
 | `GET /transactions` | Active session execution states and two-hop receipts |
 | `GET /events?after=<cursor>` | Ordered trace events; response contains `events` and `next_cursor` |
 | `POST /demo/reset` | New service allowance; keeps on-chain balances and transaction journals |
 
 Poll the cheap dashboard/events every second and the on-chain dashboard approximately every five seconds. Avoid overlapping outstanding polls. Clear session-only UI data when the session ID changes.
+
+The provider page uses the runner's read-only `GET /providers?chain=0|1` proxy. Its response includes `agent`, `providers`, `transactions`, `currency`, `chain_id`, and `payment_mode`. Provider entries add `description`, `endpoint_path`, `price_cents`, `provider_amount_cents`, and `platform_fee_cents`. Historical transactions include `created_at` and nullable `paid_at` (Unix seconds), omit purchased evidence, and carry public receipts only. A confirmed outgoing receipt is recovered from the first `provider_payment_confirmed` event even if fulfillment is pending. Count earnings only when that receipt has `status: success` and a transaction reference; repeated events do not duplicate a payment. Provider `session_earned_cents` on this route follows that same rule. This local ledger is retained across budget resets and is distinct from wallet balances. The endpoint uses the existing operator authentication and is not a public multi-tenant API.
 
 ## Prices and labels
 

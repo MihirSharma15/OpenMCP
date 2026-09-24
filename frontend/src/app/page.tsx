@@ -7,7 +7,7 @@ const agentSteps = [
   ["Pay and use", "One call pays the provider and returns the data. No API keys. No registration."],
 ];
 const serviceSteps = [
-  ["Register your service", "Receive your unique wallet address, backed by Stripe Connect."],
+  ["Register your service", "Receive your unique wallet address for per-request MPP payments."],
   ["Wrap your existing endpoints", "The Python wrapper sits in front of your app. No rewrites, no billing code."],
   ["Get paid per call", "Every request settles to your account as it is served."],
 ];
@@ -35,6 +35,7 @@ export default function Home() {
           <a href="#how">How it works</a>
           <a href="#services">For services</a>
           <a href="#endpoints">Docs</a>
+          <Link href="/providers">Dashboard</Link>
           <Link href="/demo" className="button button-small">Open the demo</Link>
         </div>
       </nav>
@@ -91,7 +92,7 @@ export default function Home() {
           </div>
           <div className="endpoint-grid">
             <div><span className="mono">/discover</span><span className="muted">Send a goal and a budget. Get back endpoints that satisfy it, with prices.</span></div>
-            <div><span className="mono">/execute</span><span className="muted">Pay and call in one atomic step. OpenMCP forwards the request and pays the provider.</span></div>
+            <div><span className="mono">/execute</span><span className="muted">Pay and request data in one call. OpenMCP verifies the agent payment, then pays the provider.</span></div>
             <div><span className="mono">/balance</span><span className="muted">Check how much of the budget the agent has left.</span></div>
           </div>
         </section>
