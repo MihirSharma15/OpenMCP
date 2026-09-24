@@ -1,10 +1,21 @@
 import json
 
 import httpx
+import pytest
 
-from tests.test_demo_runner import assert_no_blocked_keys, post, runner, wait_for_idle
+from tests.test_demo_runner import assert_no_blocked_keys, post, purchase, runner
 
 __all__ = ["runner"]
+
+ENDPOINTS = (
+    "operational-health",
+    "legal-liabilities",
+    "competitor-market-share",
+)
+
+
+async def _buy(runner, endpoint: str, key: str):
+    await runner["agent"].execute(purchase(runner, endpoint, key))
 
 
 async def test_provider_history_survives_reset_and_does_not_repay(runner):
@@ -20,8 +31,8 @@ async def test_provider_history_survives_reset_and_does_not_repay(runner):
     }
     assert all("wallet_balance" not in service for service in empty["providers"])
 
-    assert (await post(client, "/run", {"mode": "all"})).status_code == 202
-    await wait_for_idle(client)
+    for index, endpoint in enumerate(ENDPOINTS):
+        await _buy(runner, endpoint, f"provider-all-{index:04d}")
     old = (await client.get("/providers", params={"chain": 1})).json()
     assert len(old["transactions"]) == 3
     assert sum(row["provider_amount_cents"] for row in old["transactions"]) == 108
@@ -36,8 +47,7 @@ async def test_provider_history_survives_reset_and_does_not_repay(runner):
     assert fresh["agent"]["remaining_cents"] == 1500
     assert sum(service["session_earned_cents"] for service in fresh["providers"]) == 0
 
-    assert (await post(client, "/run", {"mode": "next"})).status_code == 202
-    await wait_for_idle(client)
+    await _buy(runner, ENDPOINTS[0], "provider-next-0001")
     after = (await client.get("/providers")).json()
     assert len(after["transactions"]) == 4
     assert len({row["execution_id"] for row in after["transactions"]}) == 4
@@ -49,8 +59,8 @@ async def test_provider_history_survives_reset_and_does_not_repay(runner):
 
 async def test_provider_pending_is_not_a_received_payment(runner):
     runner["providers"].fail_before_payment = True
-    await post(runner["client"], "/run", {"mode": "next"})
-    await wait_for_idle(runner["client"])
+    with pytest.raises(Exception):
+        await _buy(runner, ENDPOINTS[0], "provider-pending-0001")
     state = (await runner["client"].get("/providers")).json()
     row = state["transactions"][0]
     assert row["agent_to_openmcp"]["status"] == "success"
@@ -61,8 +71,7 @@ async def test_provider_pending_is_not_a_received_payment(runner):
 
 
 async def test_verified_provider_payment_is_visible_before_fulfillment(runner):
-    await post(runner["client"], "/run", {"mode": "next"})
-    await wait_for_idle(runner["client"])
+    await _buy(runner, ENDPOINTS[0], "provider-verified-0001")
     store = runner["engine"].store
     row = store.transactions()[0]
     # Model a response failure after the independently verified provider receipt.
@@ -85,7 +94,7 @@ async def test_verified_provider_payment_is_visible_before_fulfillment(runner):
 
 async def test_provider_feed_authentication_errors_and_secrets(runner, monkeypatch):
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=runner["app"]),
+        transport=httpx.ASGITransport(app=runner["gateway_app"]),
         base_url="http://localhost",
     ) as client:
         assert (await client.get("/providers/dashboard")).status_code == 401
