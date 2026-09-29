@@ -91,6 +91,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None):
     async def discover(body: DiscoverRequest):
         return engine.discover(body)
 
+    @app.get("/endpoints/{endpoint_id}")
+    async def endpoint_terms(endpoint_id: str):
+        return engine.endpoint_terms(endpoint_id)
+
     @app.post("/execute")
     async def execute(body: ExecuteRequest, request: Request):
         result = await engine.execute(body, request.headers.get("Payment-Authorization"))

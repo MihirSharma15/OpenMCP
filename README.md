@@ -25,6 +25,19 @@ service for agent wallets, delegated spending, cards, and a remote API registry.
 [AgentCard integration notes](docs/backend/agentcard.md) describe the isolated,
 offline-tested integration primitives and what still needs to be wired into the backend.
 
+## API Creator: infrastructure direction
+
+**Use Modal for Creator workers and generated API hosting, and third-party providers
+for inference, managed browser sessions, and subscription billing.** OpenMCP owns
+the workflow, registry, spending policy, and pay-per-call integration. The
+[API Creator README](openmcp_creator/README.md) explains the implementation, how to
+run it, and the handoff for Modal, managed browsers such as Browserbase, and AgentCard.
+
+The local Creator researches URLs with a browser and configurable inference,
+generates validated adapters, and registers paid FastAPI endpoints for discovery
+and execution. Modal deployment, managed browser integration, and automatic paid
+subscriptions are the next integrations; they are not running in this commit.
+
 ## Prices
 
 All previous API prices and absolute platform fees have been divided by ten. The platform percentage remains 10%.

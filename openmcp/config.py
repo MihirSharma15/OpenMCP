@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     )
     provider_timeout_seconds: float = Field(default=60, gt=0, le=180)
 
+    @property
+    def creator_database(self) -> Path:
+        return self.database.parent / "creator.sqlite3"
+
     def addresses(self) -> dict[str, str]:
         path = self.wallets / "public.json"
         if not path.exists():

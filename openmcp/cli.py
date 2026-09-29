@@ -145,10 +145,16 @@ async def check_mcp():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "creator":
+        from openmcp_creator.cli import main as creator_main
+
+        creator_main(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser(
         description="OpenMCP — two MPP payments per purchase on Tempo testnet"
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("creator", help="URL-to-paid-service worker; see creator --help")
     commands.add_parser("init", help="Create five fresh testnet wallets; preserve existing keys")
     commands.add_parser(
         "fund", help="Fund agent and OpenMCP wallets using the Tempo testnet faucet"
