@@ -82,7 +82,18 @@ Open `http://127.0.0.1:3000/demo`. Run, Step, Pause, Reset, and Run again use th
 
 Open `http://127.0.0.1:3000/providers` for the provider workspace: historical earnings, incoming payments, service prices, and on-chain wallet balances. Switch providers, filter dates and payment status, inspect both-hop receipts, or export payment history as CSV. The dashboard automatically updates as the agent buys data. Earnings history survives demo resets; current-session earnings and on-chain balances are labeled separately. This local operator view uses the same Python stack and Tempo testnet payments as the demo.
 
-## Claude Code
+## Codex, Claude Code, Cursor, and other MCP clients
+
+After completing the runtime setup above, install the local MCP tools and purchasing skill across your projects:
+
+```bash
+uv run openmcp install all --scope user --dry-run
+uv run openmcp install all --scope user
+```
+
+Use `codex`, `claude-code`, or `cursor` in place of `all` to select one client. Project scope, conflict handling, backups, and JSON/TOML/VS Code exports are covered in the [multi-client installation guide](docs/claude-skill/multi-client-install.md). Restart the client and enable the server. The installer keeps secrets in the existing runtime and preserves unrelated client settings. These clients share the demo wallet; use only one purchasing client at a time.
+
+### Original Claude Code repo setup
 
 Start Claude Code in this repo and enable the checked-in `.mcp.json` server. The skill at [.claude/skills/openmcp/SKILL.md](.claude/skills/openmcp/SKILL.md) can be invoked with `/openmcp`.
 

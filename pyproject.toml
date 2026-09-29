@@ -12,6 +12,7 @@ dependencies = [
   "pympp[tempo,server,sqlite]==0.11.0",
   "eth-account>=0.13,<1",
   "uvicorn>=0.34,<1",
+  "tomlkit>=0.13,<1",
 ]
 
 [project.scripts]

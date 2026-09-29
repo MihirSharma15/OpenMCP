@@ -1,4 +1,4 @@
-"""Local Claude Code MCP server. Its payment tool signs using the agent's wallet."""
+"""Local MCP server for AI clients. Purchases sign using the agent's wallet."""
 
 import json
 from contextlib import asynccontextmanager
@@ -17,6 +17,7 @@ INSTRUCTIONS = """OpenMCP purchases evidence using real MPP payments on Tempo TE
 Your local execute tool holds the agent wallet and handles a 402 challenge, signs a payment
 credential, and retries the OpenMCP request. OpenMCP independently pays the provider via MPP.
 Read balance, discover relevant data within the user budget, then execute selected endpoints.
+Obtain an explicit total user budget before buying; if missing, ask before executing.
 Use integer cents (40 = 0.40 test pathUSD). budget_cents is the TOTAL session spending limit.
 Use a fresh idempotency key per purchase and the IDENTICAL arguments/key for retries.
 Retry retryable errors at most twice. Never replace a rejected or pending payment with a new key.
@@ -67,7 +68,7 @@ def create_mcp(settings: Settings | None = None, agent=None):
         max_price_cents: int,
         budget_cents: int,
     ) -> dict[str, Any]:
-        """Pay from Claude's local wallet via MPP, then OpenMCP pays the provider via MPP.
+        """Pay from the local agent wallet via MPP, then OpenMCP pays the provider via MPP.
 
         Requires an explicitly authorized user budget. Pass the quoted max_price_cents,
         TOTAL budget_cents, schema-valid payload and active session_id. A new key is a new
