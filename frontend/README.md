@@ -32,7 +32,7 @@ Provider and date filters scope earnings, charts, and payments. Payment history 
 
 This remains a local operator workspace, with visibility into all configured providers. It is not a multi-tenant provider login. Historical reporting currently reads the complete local ledger; larger deployments will need server pagination and provider-scoped authorization.
 
-The landing page remains the supplied static design. Its service-registration CTA still scrolls to the onboarding explanation.
+The landing page keeps the original visual style and uses a horizontal “For agents / For APIs” switch to show audience-specific value propositions. Section links select the corresponding audience; the service-registration CTA scrolls to the API view. The switch supports arrow keys, Home/End, and reduced-motion preferences.
 
 ## Checks
 
