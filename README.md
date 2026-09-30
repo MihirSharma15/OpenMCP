@@ -20,6 +20,11 @@ Claude discovers providers and calls `execute`. The **local MCP process** signs 
 
 This repository includes the Claude skill, local MCP tools, discovery, budget enforcement, payment middleware, frontend APIs, and the provider service described by [docs/provider-contract.md](docs/provider-contract.md). The three provider routes return clearly labeled fictional FreightFlow evidence.
 
+The [backend game plan](docs/backend/README.md) maps this demo to a hosted, multi-user
+service for agent wallets, delegated spending, cards, and a remote API registry.
+[AgentCard integration notes](docs/backend/agentcard.md) describe the isolated,
+offline-tested integration primitives and what still needs to be wired into the backend.
+
 ## Prices
 
 All previous API prices and absolute platform fees have been divided by ten. The platform percentage remains 10%.

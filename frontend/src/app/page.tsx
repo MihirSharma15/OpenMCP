@@ -1,29 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-
-const agentSteps = [
-  ["Install the OpenMCP skill", "Sign up for the MCP server once. Your agent gets a wallet."],
-  ["Discover with a goal and a budget", "The engine returns matching endpoints, their prices, and a wallet address for each."],
-  ["Pay and use", "One call pays the provider and returns the data. No API keys. No registration."],
-];
-const serviceSteps = [
-  ["Register your service", "Receive your unique wallet address for per-request MPP payments."],
-  ["Wrap your existing endpoints", "The Python wrapper sits in front of your app. No rewrites, no billing code."],
-  ["Get paid per call", "Every request settles to your account as it is served."],
-];
-
-function Steps({ items }: { items: string[][] }) {
-  return (
-    <ol className="steps">
-      {items.map(([title, description], index) => (
-        <li key={title}>
-          <span className="step-number">0{index + 1}</span>
-          <div className="step-copy"><span className="step-title">{title}</span><span className="muted">{description}</span></div>
-        </li>
-      ))}
-    </ol>
-  );
-}
+import AudienceSwitch from "@/components/audience-switch";
 
 export default function Home() {
   return (
@@ -32,8 +9,8 @@ export default function Home() {
       <nav className="landing-nav container" aria-label="Primary">
         <a href="#top" className="wordmark">OpenMCP</a>
         <div className="nav-links">
-          <a href="#how">How it works</a>
-          <a href="#services">For services</a>
+          <a href="#how">For agents</a>
+          <a href="#services">For APIs</a>
           <a href="#endpoints">Docs</a>
           <Link href="/providers">Dashboard</Link>
           <Link href="/demo" className="button button-small">Open the demo</Link>
@@ -66,24 +43,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how" className="how-section container section-space">
-          <div className="section-heading">
-            <div className="eyebrow">How it works</div>
-            <h2>One search engine to find services. One wallet to pay them.</h2>
-          </div>
-          <div className="setup-grid">
-            <div className="setup-card">
-              <div className="setup-heading"><h3>For agents</h3><span>Connect once</span></div>
-              <Steps items={agentSteps} />
-              <pre className="code-block">{'POST /discover\n{ "query": "freight carrier court filings",\n  "budget": 15.00 }'}</pre>
-            </div>
-            <div id="services" className="setup-card">
-              <div className="setup-heading"><h3>For services</h3><span>Two-step setup</span></div>
-              <Steps items={serviceSteps} />
-              <pre className="code-block">{'from openmcp import Wrapper\n\nopenmcp = Wrapper(service_id="[YOUR SERVICE ID]")\napp = openmcp.wrap(app)  # your existing endpoints'}</pre>
-            </div>
-          </div>
-        </section>
+        <AudienceSwitch />
 
         <section id="endpoints" className="endpoints-section container section-space">
           <div className="section-heading">
@@ -112,7 +72,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="landing-footer container"><span>OpenMCP</span><span>Payments by Stripe Connect</span></footer>
+      <footer className="landing-footer container"><span>OpenMCP</span></footer>
     </div>
   );
 }
