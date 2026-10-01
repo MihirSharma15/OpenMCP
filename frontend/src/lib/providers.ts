@@ -68,7 +68,7 @@ export function earningsSeries(transactions: ProviderTransaction[], period: Peri
 
 export function paymentsCsv(transactions: ProviderTransaction[]): string {
   const rows = [
-    ["Execution ID", "Provider", "Endpoint", "Date (UTC)", "Status", "Agent paid (test pathUSD)", "Platform fee (test pathUSD)", "Provider received (test pathUSD)", "Provider receipt", "Agent receipt"],
+    ["Execution ID", "Provider", "Endpoint", "Date (UTC)", "Status", "Agent paid (USD)", "Platform fee (USD)", "Provider received (USD)", "Provider receipt", "Agent receipt"],
     ...transactions.map(transaction => [
       transaction.execution_id, transaction.provider, transaction.endpoint_id,
       new Date(paymentTime(transaction) * 1000).toISOString(), paymentLabel(transaction),

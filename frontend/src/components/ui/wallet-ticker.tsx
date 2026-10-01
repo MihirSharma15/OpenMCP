@@ -11,5 +11,6 @@ export function WalletTicker({ balance }: { balance: WalletBalance | undefined }
       ? balance.balance_units / 10 ** balance.decimals
       : NaN;
   if (!Number.isFinite(amount)) return <>Unavailable</>;
-  return <><NumberTicker value={amount} decimalPlaces={2} /> {balance.token ?? "pathUSD"}</>;
+  const tokenLabel = !balance.token || balance.token === "pathUSD" ? "USD" : balance.token;
+  return <><NumberTicker value={amount} decimalPlaces={2} /> {tokenLabel}</>;
 }

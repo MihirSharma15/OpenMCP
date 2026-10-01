@@ -242,7 +242,7 @@ export default function Demo() {
           </div>
           <div className="wallet-line">
             <span>
-              <strong>On-chain wallet balance</strong>
+              <strong>Wallet balance</strong>
               <small>
                 Agent wallet ·{" "}
                 <span className="mono" title={state.agent?.address}>
