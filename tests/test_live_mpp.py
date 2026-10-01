@@ -22,7 +22,7 @@ from tests.provider_fixture import ProviderFixture
 )
 async def test_live_two_hop_settlement():
     run = Path(".openmcp/live-check") / uuid4().hex
-    settings = Settings(database=run / "mpp.sqlite3")
+    settings = Settings(database=run / "mpp.sqlite3", product_database_url="")
     providers = ProviderFixture(settings)
     outgoing = PaidClient(settings, "openmcp", transport=httpx.ASGITransport(app=providers.app))
     engine = Engine(settings, outgoing=outgoing)

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     budget_cents: int = Field(default=1500, ge=1, alias="OPENMCP_BUDGET_CENTS")
     fee_bps: int = Field(default=1000, ge=0, lt=10000, alias="OPENMCP_FEE_BPS")
     database: Path = Field(default=Path(".openmcp/mpp.sqlite3"), alias="OPENMCP_DATABASE")
+    # Product credit ledger. Empty does not connect. A URL is migrated when the app is created.
+    product_database_url: str = Field(default="", alias="OPENMCP_PRODUCT_DATABASE_URL")
     catalog: Path = Field(default=Path("catalog/providers.json"), alias="OPENMCP_CATALOG")
     wallets: Path = Field(default=Path(".openmcp/wallets"), alias="OPENMCP_WALLETS")
     base_url: str = Field(default="http://127.0.0.1:8000", alias="OPENMCP_BASE_URL")

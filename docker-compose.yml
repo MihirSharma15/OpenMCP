@@ -1,0 +1,16 @@
+# Local credit-ledger Postgres. Tests use localhost:5433 and skip when this is down.
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: openmcp
+      POSTGRES_PASSWORD: openmcp
+      POSTGRES_DB: openmcp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openmcp -d openmcp"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s

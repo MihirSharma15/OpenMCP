@@ -7,6 +7,7 @@ import pytest
 from eth_hash.auto import keccak
 from mpp import Credential, Receipt
 
+from openmcp.adapters.memory import MemoryLedger
 from openmcp.agent import Agent
 from openmcp.app import create_app
 from openmcp.config import CHAIN_ID, Settings
@@ -101,6 +102,7 @@ def settings(tmp_path):
         database=tmp_path / "mpp.db",
         wallets=wallets,
         catalog=ROOT / "catalog/providers.json",
+        product_database_url="",
     )
 
 
@@ -117,7 +119,7 @@ async def system(settings):
         chain=chain,
     )
     engine = Engine(settings, incoming_intent=chain.intent(), outgoing=outgoing, chain=chain)
-    app = create_app(settings, engine)
+    app = create_app(settings, engine, ledger=MemoryLedger())
     transport = httpx.ASGITransport(app=app)
     paid = PaidClient(
         settings, "agent", transport=transport, method=chain.method(addresses["agent"]), chain=chain
