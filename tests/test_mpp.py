@@ -98,6 +98,20 @@ async def test_session_budget_from_reset_caps_purchases_as_remaining_falls(syste
     assert system["chain"].broadcasts == 2
 
 
+async def test_raised_session_budget_overrides_configured_default(system):
+    system["settings"].budget_cents = 30
+    Agent.result(await system["agent"].http.post("/demo/reset", json={"budget_cents": 100}))
+
+    result = await system["agent"].execute(purchase(system, "legal-liabilities", budget=100))
+
+    assert result["status"] == "completed"
+    balance = system["engine"].store.balance()
+    assert balance["budget_cents"] == 100
+    assert balance["spent_cents"] == 50
+    assert balance["remaining_cents"] == 50
+    assert system["chain"].broadcasts == 2
+
+
 async def test_gateway_reset_sets_positive_budget_and_defaults(system):
     original_session = system["engine"].store.balance()["session_id"]
 

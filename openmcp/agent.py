@@ -3,8 +3,9 @@
 import hashlib
 
 import httpx
+from jsonschema import validate
 
-from .config import Settings, load_catalog
+from .config import CHAIN_ID, TOKEN, Settings, load_catalog
 from .models import ExecuteRequest, OpenMCPError
 from .payments import PaidClient, canonical, memo_for
 
@@ -49,7 +50,29 @@ class Agent:
 
     async def execute(self, request: ExecuteRequest):
         provider = self.catalog.get(request.endpoint_id)
-        if not provider or provider.price_cents > request.max_price_cents:
+        if provider:
+            cents = provider.price_cents
+        else:
+            # The authenticated gateway supplies immutable endpoint terms. The client
+            # pins the receiving wallet, network, token, request body and user ceiling;
+            # it never follows a model-supplied execution or payment URL.
+            terms = self.result(await self.http.get(f"/endpoints/{request.endpoint_id}"))
+            if (
+                terms.get("endpoint_id") != request.endpoint_id
+                or terms.get("chain_id") != CHAIN_ID
+                or str(terms.get("token_address", "")).lower() != TOKEN.lower()
+                or str(terms.get("pay_to", "")).lower()
+                != self.settings.addresses()["openmcp"].lower()
+                or terms.get("execute_path") != "/execute"
+                or type(terms.get("price_cents")) is not int
+                or terms["price_cents"] <= 0
+            ):
+                raise OpenMCPError(
+                    "unapproved_terms", "Remote endpoint payment terms are invalid", 409
+                )
+            cents = terms["price_cents"]
+            validate(request.payload, terms["input_schema"])
+        if cents > request.max_price_cents:
             raise OpenMCPError(
                 "unapproved_price", "Unknown endpoint or price exceeds approval.", 409
             )
@@ -61,7 +84,7 @@ class Agent:
             key=request.idempotency_key,
             scope=request.session_id,
             recipient=self.settings.addresses()["openmcp"],
-            cents=provider.price_cents,
+            cents=cents,
             budget=request.budget_cents,
             memo=memo_for(fingerprint),
             headers=self.headers,

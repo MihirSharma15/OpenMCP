@@ -248,11 +248,11 @@ def _validate_configuration(
     for route_id, (provider, tool) in declared.items():
         entry = catalog[route_id]
         parsed_url = urlparse(str(entry.url))
+        base_url = urlparse(settings.base_url.rstrip("/"))
         if (
             entry.name != provider.name
             or entry.wallet != provider.wallet
-            or parsed_url.hostname != "127.0.0.1"
-            or parsed_url.port != 9001
+            or (parsed_url.scheme, parsed_url.netloc) != (base_url.scheme, base_url.netloc)
             or parsed_url.path != tool.route
             or parsed_url.query
             or parsed_url.fragment

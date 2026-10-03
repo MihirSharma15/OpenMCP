@@ -29,6 +29,7 @@ class ProviderSettings(BaseSettings):
         alias="OPENMCP_CATALOG",
     )
     fee_bps: int = Field(default=1000, ge=0, lt=10_000, alias="OPENMCP_FEE_BPS")
+    base_url: str = "http://127.0.0.1:9001"
     rpc_url: str = Field(
         default="https://rpc.moderato.tempo.xyz",
         alias="TEMPO_RPC_URL",

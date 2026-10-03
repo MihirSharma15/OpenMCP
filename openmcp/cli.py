@@ -145,17 +145,26 @@ async def check_mcp():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "creator":
+        from openmcp_creator.cli import main as creator_main
+
+        creator_main(sys.argv[2:])
+        return
+    from .client_setup.installer import InstallError, register_commands, run
+
     parser = argparse.ArgumentParser(
         description="OpenMCP — two MPP payments per purchase on Tempo testnet"
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("creator", help="URL-to-paid-service worker; see creator --help")
+    register_commands(commands)
     commands.add_parser("init", help="Create five fresh testnet wallets; preserve existing keys")
     commands.add_parser(
         "fund", help="Fund agent and OpenMCP wallets using the Tempo testnet faucet"
     )
     serve = commands.add_parser("serve", help="Serve the MPP payment-gated HTTP middleware")
     serve.add_argument("--port", type=int, default=8000)
-    commands.add_parser("mcp", help="Claude Code's local MCP server and agent-side wallet")
+    commands.add_parser("mcp", help="Local MCP server and agent-side wallet for AI clients")
     commands.add_parser("check-mcp", help="Free stdio MCP connection check")
     doctor = commands.add_parser("doctor", help="Show public configuration, never private keys")
     doctor.add_argument("--chain", action="store_true", help="Also query testnet wallet balances")
@@ -166,6 +175,9 @@ def main():
     )
     args = parser.parse_args()
     try:
+        if args.command in ("install", "mcp-config"):
+            run(args)
+            return
         if args.command == "init":
             initialize()
             return
@@ -186,7 +198,10 @@ def main():
             asyncio.run(inspect_wallets(settings, network=args.chain))
         else:
             asyncio.run(api_command(settings, args.command))
-    except (ValueError, OpenMCPError, httpx.HTTPError) as exc:
+    except InstallError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+    except (ValueError, OSError, OpenMCPError, httpx.HTTPError) as exc:
         # No SDK exception strings or signed credentials in terminal output.
         message = (
             exc.message

@@ -9,6 +9,7 @@ from mpp import Challenge, Receipt
 from .config import CHAIN_ID, TOKEN, Settings, load_catalog
 from .models import DiscoverRequest, ExecuteRequest, OpenMCPError
 from .payments import PaidClient, canonical, make_receiver, memo_for, receipt_dict
+from .registry import registered_providers
 from .store import Store
 from .wallets import Chain
 
@@ -31,7 +32,29 @@ class Engine:
         await self.outgoing.close()
         await self.chain.close()
 
+    def refresh_catalog(self):
+        for key, provider in registered_providers(self.settings.creator_database).items():
+            if key in self.catalog and self.catalog[key] != provider:
+                raise OpenMCPError("registry_conflict", "Registered endpoint terms changed", 503)
+            self.catalog[key] = provider
+
+    def endpoint_terms(self, endpoint_id):
+        self.refresh_catalog()
+        provider = self.catalog.get(endpoint_id)
+        if provider is None:
+            raise OpenMCPError("endpoint_not_found", "Unknown endpoint", 404)
+        return {
+            "endpoint_id": provider.id,
+            "price_cents": provider.price_cents,
+            "input_schema": provider.input_schema,
+            "chain_id": CHAIN_ID,
+            "token_address": TOKEN,
+            "pay_to": self.addresses["openmcp"],
+            "execute_path": "/execute",
+        }
+
     def discover(self, request: DiscoverRequest):
+        self.refresh_catalog()
         balance = self.store.balance()
         tokens = set(re.findall(r"[a-z0-9]+", request.query.lower()))
         broad = bool(tokens & {"diligence", "acquisition", "acquiring"})
@@ -74,6 +97,7 @@ class Engine:
         }
 
     async def execute(self, request: ExecuteRequest, authorization: str | None = None):
+        self.refresh_catalog()
         body = request.model_dump()
         fingerprint = hashlib.sha256(canonical(body)).hexdigest()
         async with self.lock:
@@ -274,6 +298,7 @@ class Engine:
         }
 
     async def dashboard(self, include_chain=True):
+        self.refresh_catalog()
         rows = self.store.transactions()
         providers = [
             {
