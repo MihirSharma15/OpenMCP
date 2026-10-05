@@ -52,8 +52,11 @@ class Change:
         return "create" if self.before is None else "update"
 
 
-def skill_text():
-    return files("openmcp.client_setup").joinpath("skills/openmcp/SKILL.md").read_text("utf-8")
+def skill_text(mode="demo"):
+    if mode not in ("demo", "account"):
+        raise InstallError("Choose demo or account mode.")
+    folder = "openmcp-account" if mode == "account" else "openmcp"
+    return files("openmcp.client_setup").joinpath(f"skills/{folder}/SKILL.md").read_text("utf-8")
 
 
 def runtime_directory(value: Path | None = None):
@@ -68,16 +71,20 @@ def runtime_directory(value: Path | None = None):
     return root
 
 
-def server_entry(runtime_dir: Path):
+def server_entry(runtime_dir: Path, mode="demo"):
+    if mode not in ("demo", "account"):
+        raise InstallError("Choose demo or account mode.")
     # Do not resolve this symlink: resolving venv/bin/python can discard the venv.
     return {
         "command": str(Path(sys.executable).absolute()),
-        "args": ["-m", "openmcp.client_setup.launch", "--runtime-dir", str(runtime_dir)],
+        "args": ["-m", "openmcp.client_setup.launch"]
+        + (["--mode", "account"] if mode == "account" else [])
+        + ["--runtime-dir", str(runtime_dir)],
     }
 
 
-def export_config(runtime_dir: Path, format: str):
-    entry = server_entry(runtime_dir)
+def export_config(runtime_dir: Path, format: str, mode="demo"):
+    entry = server_entry(runtime_dir, mode)
     if format == "toml":
         return tomlkit.dumps({"mcp_servers": {"openmcp": {**entry, "tool_timeout_sec": 180}}})
     if format == "vscode":
@@ -144,8 +151,8 @@ def _config_change(path, entry, *, toml=False, replace=False):
     return Change(path, original, content)
 
 
-def _skill_change(path, *, replace):
-    original, content = _read(path), skill_text()
+def _skill_change(path, *, replace, mode="demo"):
+    original, content = _read(path), skill_text(mode)
     if original is not None and original != content and not replace:
         raise InstallError(
             f"A different openmcp skill exists in {path}; review it and rerun with --replace."
@@ -153,7 +160,9 @@ def _skill_change(path, *, replace):
     return Change(path, original, content)
 
 
-def plan_install(client, scope, project, runtime_dir, *, replace=False, home=None, environ=None):
+def plan_install(
+    client, scope, project, runtime_dir, *, replace=False, home=None, environ=None, mode="demo"
+):
     """Preflight every destination before changing any configuration."""
     if client not in (*CLIENTS, "all") or scope not in ("project", "user"):
         raise InstallError("Choose codex, claude-code, cursor, or all and project/user scope.")
@@ -164,7 +173,7 @@ def plan_install(client, scope, project, runtime_dir, *, replace=False, home=Non
         raise InstallError(f"Project directory does not exist: {project}")
     root = project if scope == "project" else home
     selected = CLIENTS if client == "all" else (client,)
-    entry = server_entry(runtime_dir)
+    entry = server_entry(runtime_dir, mode)
     changes = {}
     for name in selected:
         if name == "codex":
@@ -190,7 +199,7 @@ def plan_install(client, scope, project, runtime_dir, *, replace=False, home=Non
             toml=name == "codex",
             replace=replace,
         )
-        changes[skill] = _skill_change(skill, replace=replace)
+        changes[skill] = _skill_change(skill, replace=replace, mode=mode)
     return list(changes.values())
 
 
@@ -250,14 +259,20 @@ def register_commands(commands):
     )
     export.add_argument("--format", choices=("json", "toml", "vscode"), default="json")
     export.add_argument("--runtime-dir", type=Path)
+    for command in (parser, export):
+        command.add_argument(
+            "--mode", choices=("demo", "account"), default=os.environ.get("OPENMCP_MODE", "demo")
+        )
 
 
 def run(args):
     root = runtime_directory(args.runtime_dir)
     if args.command == "mcp-config":
-        print(export_config(root, args.format), end="")
+        print(export_config(root, args.format, args.mode), end="")
         return
-    changes = plan_install(args.client, args.scope, args.project, root, replace=args.replace)
+    changes = plan_install(
+        args.client, args.scope, args.project, root, replace=args.replace, mode=args.mode
+    )
     results = (
         [{"path": str(c.path), "action": c.action} for c in changes]
         if args.dry_run
@@ -272,6 +287,10 @@ def run(args):
     print(
         "Restart your client and enable/trust the OpenMCP server to load balance, discover, execute."
     )
+    if args.mode == "account":
+        print("Account mode also includes execution_status. Run openmcp check-mcp --mode account.")
+        print("Use openmcp connect to save a dashboard-issued agent credential privately.")
+        return
     print(
         "The local gateway/provider stack must be running; run openmcp check-mcp from the runtime directory."
     )

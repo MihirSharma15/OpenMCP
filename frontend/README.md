@@ -2,6 +2,63 @@
 
 Next.js App Router implementation of the supplied OpenMCP HTML design.
 
+## Account MVP
+
+The account website is `/dashboard`, with Overview, Transactions, and Agents.
+It uses Clerk for human sessions and the FastAPI account API for every balance,
+payment, purchase result, and credential operation. The existing local demo and
+provider observer remain separate from this account flow.
+
+1. Run `npm install` to install the current Clerk SDK and update the lockfile.
+2. Configure Clerk with `npx -y clerk@latest init` and verify with
+   `npx -y clerk@latest doctor`. Do not commit generated keys. A claimable Clerk
+   development application must be claimed and configured for production before
+   accepting real users.
+3. Copy the placeholders from `.env.example` into your local environment and
+   provide the Clerk keys. Set `OPENMCP_API_URL` to the account FastAPI origin,
+   with no `/v1` suffix. `OPENMCP_PUBLIC_API_URL` is the public API origin shown
+   in agent connection instructions.
+4. Start the account API and worker according to the repository MVP runbook,
+   then run `npm run dev` and open **http://localhost:3000**.
+
+Use the exact same website origin for `OPENMCP_APP_ORIGIN`, backend
+`OPENMCP_PRODUCT_FRONTEND_URL`, and Clerk's authorized parties/redirect setup.
+`localhost` and `127.0.0.1` are different browser origins; mixing them breaks
+session/CSRF checks after Checkout returns. The API itself can still use
+`http://127.0.0.1:8000`.
+
+The Next.js dev/start commands bind to `localhost` as well. This avoids a local
+Next.js/Clerk same-request rewrite being treated as an external proxy request
+when the listening hostname and normalized request hostname differ.
+
+The `/api/openmcp/*` route is an allowlisted same-origin proxy. It obtains the
+signed-in user's Clerk session token on the server, forwards it to FastAPI for
+independent verification, rejects cross-origin mutations, and disables shared
+caching. It never forwards the local demo operator token. Missing Clerk or API
+configuration produces an unavailable state, never sample money or identities.
+
+Top-ups redirect to Stripe-hosted Checkout; Link appears when enabled and
+available on the Stripe account. Browser redirects cannot credit a wallet.
+The return page reads an account-owned `top_up_id` and polls verified payment
+status. A `canceled=1` parameter only describes navigation. Deposits and service
+refunds display backend-confirmed amounts; uncertain purchases remain pending
+or under review.
+
+Agent allowances are lifetime caps of $0.01–$10,000 and expire within 30 days.
+Keys are displayed once and retained only in component memory. The private
+connection prompt saves a local credential file; setup examples never embed
+the key. For configured deployments, verify the $10 deposit / $0.40 purchase
+journey, a failed-purchase refund, a canceled Checkout, credential revocation,
+and sign-out/account switching before enabling live payments.
+
+`npm test` exercises API errors, safe payment/receipt URLs, exact-cent limits,
+Checkout retry/terminal-state handling, proxy route allowlisting, and CSRF
+origin checks alongside existing demo/provider tests. Full browser and build
+checks require the Clerk package to be installed and the external services to
+be configured; no development auth substitute is included.
+
+## Existing local demo
+
 Start the Python gateway, providers, traditional APIs, and token-only demo observer from the repository root:
 
 ```sh
@@ -16,7 +73,7 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. The landing page is at `/`, the live FreightFlow demo is at `/demo`, and the provider dashboard is at `/providers`.
+Open http://localhost:3000. The landing page is at `/`, the live FreightFlow demo is at `/demo`, and the provider dashboard is at `/providers`.
 
 ## Design
 

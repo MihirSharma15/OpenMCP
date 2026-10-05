@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import AudienceSwitch from "@/components/audience-switch";
+import { AuthControls } from "@/components/account/auth-controls";
+import { clerkConfigured } from "@/lib/account-config";
 
 export default function Home() {
   return (
@@ -12,8 +14,7 @@ export default function Home() {
           <a href="#how">For agents</a>
           <a href="#services">For APIs</a>
           <a href="#endpoints">Docs</a>
-          <Link href="/providers">Dashboard</Link>
-          <Link href="/demo" className="button button-small">Open the demo</Link>
+          <AuthControls enabled={clerkConfigured()} />
         </div>
       </nav>
 
@@ -21,9 +22,9 @@ export default function Home() {
         <section id="top" className="hero container">
           <div className="eyebrow accent">Pay-per-call access for AI agents</div>
           <h1>Unlimited APIs. One Wallet.</h1>
-          <p className="hero-description">OpenMCP turns any API or MCP server into a pay-as-you-go service. Agents find you, pay per request, and get your data back. No accounts, no API keys.</p>
+          <p className="hero-description">Fund one wallet. Give your AI agent a spending limit. Let it discover useful services, pay per request, and bring the results back. Every purchase and refund in one place.</p>
           <div className="hero-actions">
-            <a href="#services" className="button">Register your service</a>
+            <Link href="/dashboard" className="button">Open your wallet</Link>
             <Link href="/demo" className="text-link">Watch an agent pay for data</Link>
           </div>
         </section>
@@ -52,7 +53,7 @@ export default function Home() {
           </div>
           <div className="endpoint-grid">
             <div><span className="mono">/discover</span><span className="muted">Send a goal and a budget. Get back endpoints that satisfy it, with prices.</span></div>
-            <div><span className="mono">/execute</span><span className="muted">Pay and request data in one call. OpenMCP verifies the agent payment, then pays the provider.</span></div>
+            <div><span className="mono">/execute</span><span className="muted">Buy a service within your spending allowance. OpenMCP pays the provider and returns the result.</span></div>
             <div><span className="mono">/balance</span><span className="muted">Check how much of the budget the agent has left.</span></div>
           </div>
         </section>

@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1",
+    "dev": "next dev --hostname localhost",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1",
+    "start": "next start --hostname localhost",
     "typecheck": "tsc --noEmit",
     "test": "vitest run src && node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.0",
     "motion": "^13.4.2",
     "next": "^16.3.6",
     "react": "^19.3.0",

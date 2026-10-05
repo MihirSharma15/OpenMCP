@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "scope": "Approved real-money pilot. Account credits plus one outgoing MPP settlement. No withdrawals, subscriptions, Creator expansion, marketplace, or new SDK.",
+  "conventions": {
+    "base_path": "/v1",
+    "money": "integer cents, USD credits",
+    "auth": "Clerk bearer for humans, opaque agent bearer for machines",
+    "idempotency": "Idempotency-Key header on top-up creation and execute; same key plus different body returns 409",
+    "pagination": {
+      "items": [],
+      "next_cursor": null
+    },
+    "error": {
+      "error": {
+        "code": "insufficient_funds",
+        "message": "Insufficient available credits.",
+        "retryable": false
+      },
+      "request_id": "req_example"
+    },
+    "mode": "OPENMCP_MODE=account selects account client/CLI; backend OPENMCP_PRODUCT_MODE=test|live (test default); live requires explicit configuration",
+    "agent_expiry": "default 7 days, maximum 30 days; ISO 8601 UTC; positive lifetime cap; replacement keys never reset it",
+    "frontend_proxy": "/api/openmcp/* maps only listed backend routes; backend independently verifies Clerk tokens"
+  },
+  "responses": {
+    "me": {
+      "account_id": "acct_example",
+      "status": "active",
+      "currency": "usd_credits",
+      "top_up_presets_cents": [
+        500,
+        1000,
+        2500,
+        5000
+      ],
+      "mode": "test"
+    },
+    "wallet": {
+      "account_id": "acct_example",
+      "balance_cents": 1000,
+      "reserved_cents": 40,
+      "available_cents": 960,
+      "deficit_cents": 0,
+      "spent_cents": 0,
+      "currency": "usd_credits",
+      "status": "active",
+      "agent": null
+    },
+    "agent_allowance": {
+      "agent_id": "agt_example",
+      "spend_limit_cents": 200,
+      "spent_cents": 0,
+      "reserved_cents": 40,
+      "remaining_cents": 160,
+      "expires_at": "2026-10-10T00:00:00Z"
+    },
+    "top_up": {
+      "id": "top_example",
+      "amount_cents": 1000,
+      "currency": "usd",
+      "status": "awaiting_payment",
+      "checkout_url": "https://checkout.stripe.com/c/pay/example",
+      "expires_at": "2026-10-04T00:00:00Z",
+      "credited_at": null
+    },
+    "agent": {
+      "agent_id": "agt_example",
+      "name": "Research assistant",
+      "spend_limit_cents": 200,
+      "spent_cents": 0,
+      "reserved_cents": 0,
+      "remaining_cents": 200,
+      "expires_at": "2026-10-10T00:00:00Z",
+      "status": "active",
+      "credentials": [
+        {
+          "credential_id": "cred_example",
+          "created_at": "2026-10-03T00:00:00Z",
+          "expires_at": "2026-10-10T00:00:00Z",
+          "revoked": false
+        }
+      ]
+    },
+    "credential": {
+      "agent_id": "agt_example",
+      "credential_id": "cred_example",
+      "secret": "ONE_TIME_SECRET",
+      "expires_at": "2026-10-10T00:00:00Z"
+    },
+    "transaction": {
+      "id": "txn_example",
+      "type": "purchase",
+      "status": "pending",
+      "amount_cents": -40,
+      "currency": "usd_credits",
+      "description": "Example service",
+      "created_at": "2026-10-03T00:00:00Z",
+      "balance_after_cents": null,
+      "agent_id": "agt_example",
+      "agent_name": "Research assistant",
+      "endpoint_id": "example-service",
+      "execution_id": "exe_example",
+      "related_transaction_id": null,
+      "receipt_url": null
+    },
+    "discovery": {
+      "endpoints": [
+        {
+          "endpoint_id": "example-service",
+          "name": "Example service",
+          "description": "Configured useful service",
+          "price_cents": 40,
+          "provider_price_cents": 36,
+          "platform_fee_cents": 4,
+          "currency": "usd_credits",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          },
+          "affordable": true
+        }
+      ],
+      "available_cents": 1000,
+      "remaining_allowance_cents": 200,
+      "discovery_is_free": true
+    },
+    "execution": {
+      "execution_id": "exe_example",
+      "endpoint_id": "example-service",
+      "status": "completed",
+      "price_cents": 40,
+      "charged_cents": 40,
+      "refunded_cents": 0,
+      "currency": "usd_credits",
+      "data": {
+        "answer": "provider data"
+      },
+      "provider_receipt": {
+        "reference": "0xexample",
+        "explorer_url": "https://explore.tempo.xyz/tx/0xexample"
+      },
+      "ledger_transaction_id": "txn_example",
+      "error": null,
+      "status_url": "/v1/executions/exe_example",
+      "created_at": "2026-10-03T00:00:00Z"
+    }
+  },
+  "routes": [
+    [
+      "POST",
+      "/me/bootstrap",
+      {},
+      "me"
+    ],
+    [
+      "GET",
+      "/me",
+      null,
+      "me"
+    ],
+    [
+      "GET",
+      "/wallet",
+      null,
+      "wallet"
+    ],
+    [
+      "POST",
+      "/wallet/top-ups",
+      {
+        "amount_cents": 1000
+      },
+      "top_up"
+    ],
+    [
+      "GET",
+      "/wallet/top-ups/{id}",
+      null,
+      "top_up"
+    ],
+    [
+      "POST",
+      "/webhooks/stripe",
+      "raw signed Stripe body",
+      "accepted"
+    ],
+    [
+      "GET",
+      "/transactions?limit=20&cursor=&type=&status=",
+      null,
+      "paginated transaction"
+    ],
+    [
+      "GET",
+      "/transactions/{id}",
+      null,
+      "transaction"
+    ],
+    [
+      "GET",
+      "/agents",
+      null,
+      "paginated agent"
+    ],
+    [
+      "POST",
+      "/agents",
+      {
+        "name": "Research assistant",
+        "spend_limit_cents": 200,
+        "expires_at": "2026-10-10T00:00:00Z"
+      },
+      "agent"
+    ],
+    [
+      "POST",
+      "/agents/{id}/credentials",
+      {},
+      "credential"
+    ],
+    [
+      "POST",
+      "/agents/{id}/credentials/{credential_id}/revoke",
+      {},
+      "revoked credential metadata"
+    ],
+    [
+      "POST",
+      "/discover",
+      {
+        "query": "example",
+        "budget_cents": 200
+      },
+      "discovery"
+    ],
+    [
+      "POST",
+      "/execute",
+      {
+        "endpoint_id": "example-service",
+        "payload": {
+          "query": "example"
+        },
+        "max_price_cents": 40
+      },
+      "execution (200 completed, 202 pending)"
+    ],
+    [
+      "GET",
+      "/executions/{id}",
+      null,
+      "execution"
+    ]
+  ],
+  "states": {
+    "top_up": [
+      "creating",
+      "awaiting_payment",
+      "processing",
+      "credited",
+      "failed",
+      "expired"
+    ],
+    "execution": [
+      "reserved",
+      "payment_pending",
+      "fulfillment_pending",
+      "completed",
+      "failed",
+      "refunded",
+      "needs_review"
+    ],
+    "transaction_type": [
+      "deposit",
+      "purchase",
+      "refund",
+      "reversal"
+    ],
+    "transaction_status": [
+      "pending",
+      "completed",
+      "failed",
+      "refunded",
+      "needs_review"
+    ],
+    "agent": [
+      "active",
+      "exhausted",
+      "expired",
+      "revoked"
+    ]
+  },
+  "ownership": {
+    "frontend": "frontend/ only; may create frontend .env.example placeholders; no backend edits",
+    "backend": "openmcp/product/, app/config adapters as necessary, backend tests, pyproject.toml uv.lock .env.example docker-compose.yml; do not edit root-owned CLI/client/MCP files",
+    "coordinator": "docs/, README.md, openmcp/cli.py, openmcp/account_client.py, openmcp/account_mcp.py, openmcp/client_setup/, tests/test_account_client.py"
+  },
+  "backend_entrypoints": {
+    "app": "openmcp.product.app:create_app",
+    "worker": "python -m openmcp.product.cli worker",
+    "coordinator_serve": "openmcp serve --mode account",
+    "coordinator_mcp": "openmcp mcp --mode account"
+  },
+  "client_config": {
+    "OPENMCP_MODE": "account",
+    "OPENMCP_ACCOUNT_BASE_URL": "http://127.0.0.1:8000",
+    "OPENMCP_AGENT_TOKEN_FILE": "private credential file",
+    "OPENMCP_ACCOUNT_STATE": "private client journal directory"
+  }
+}

@@ -1,0 +1,61 @@
+name: Account MVP checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: openmcp
+          POSTGRES_PASSWORD: openmcp
+          POSTGRES_DB: openmcp
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U openmcp -d openmcp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      OPENMCP_PRODUCT_DATABASE_URL: postgresql://openmcp:openmcp@localhost:5433/openmcp
+      OPENMCP_REQUIRE_POSTGRES: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: python -m pip install uv
+      - run: uv sync --locked
+      - name: Check account code
+        run: uv run ruff check openmcp/account_client.py openmcp/account_mcp.py openmcp/product tests/test_account_client.py tests/test_product_*.py
+      - name: Require real PostgreSQL monetary tests
+        run: uv run pytest tests/test_product_postgres.py -q
+      - name: Run full Python regression suite
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run typecheck

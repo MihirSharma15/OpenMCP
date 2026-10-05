@@ -1,5 +1,11 @@
 # OpenMCP
 
+The account MVP adds Clerk sign-in, Stripe-funded USD credits, capped agent credentials,
+transaction history, and outgoing MPP purchases. See [account setup](docs/account-mvp.md)
+and the [implementation tickets](docs/mvp-tickets.md). It runs in explicit account mode;
+the testnet demo below remains a separate flow. Live use requires production configuration,
+a funded platform treasury, and an enabled live provider.
+
 Get paid for data you already own. This POC demonstrates **MPP on both payment hops**, using real transactions on **Tempo Moderato testnet**. No Stripe account, card, Connect account, or real money is involved.
 
 ```text
