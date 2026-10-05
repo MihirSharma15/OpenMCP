@@ -58,7 +58,11 @@ class Service(BaseModel):
 class ProductSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
     mode: Literal["test", "live"] = Field(default="test", alias="OPENMCP_PRODUCT_MODE")
-    database_url: str = Field(default="", alias="OPENMCP_PRODUCT_DATABASE_URL")
+    database_url: str = Field(default="", alias="OPENMCP_PRODUCT_DATABASE_URL", repr=False)
+    database_provider: Literal["postgres", "supabase"] = Field(
+        default="postgres", alias="OPENMCP_DATABASE_PROVIDER"
+    )
+    database_pool_max: int = Field(default=4, ge=1, le=20, alias="OPENMCP_DATABASE_POOL_MAX")
     database_schema: str = Field(default="openmcp_product", alias="OPENMCP_PRODUCT_DATABASE_SCHEMA")
     frontend_url: str = Field(default="http://localhost:3000", alias="OPENMCP_PRODUCT_FRONTEND_URL")
     clerk_issuer: str = Field(default="", alias="CLERK_ISSUER_URL")
@@ -99,8 +103,7 @@ class ProductSettings(BaseSettings):
         }
 
     def validate_startup(self):
-        if not self.database_url.startswith(("postgresql://", "postgres://")):
-            raise ValueError("OPENMCP_PRODUCT_DATABASE_URL must point to persistent PostgreSQL")
+        self.validate_database()
         if not self.clerk_issuer.startswith("https://") or not self.clerk_authorized_parties:
             raise ValueError("CLERK_ISSUER_URL and CLERK_AUTHORIZED_PARTIES are required")
         key = self.stripe_key.get_secret_value()
@@ -130,3 +133,10 @@ class ProductSettings(BaseSettings):
                 raise ValueError("Live mode needs a private treasury key file")
             if not self.services():
                 raise ValueError("Live mode needs an explicitly enabled live provider")
+
+    def validate_database(self):
+        from openmcp.database import DatabaseManager
+
+        if not self.database_url.startswith(("postgresql://", "postgres://")):
+            raise ValueError("OPENMCP_PRODUCT_DATABASE_URL must point to persistent PostgreSQL")
+        DatabaseManager.validate_dsn(self.database_url, self.database_provider)

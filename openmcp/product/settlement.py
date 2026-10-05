@@ -158,10 +158,14 @@ class Treasury:
 
     @staticmethod
     def ensure_lock(lock_connection):
-        if lock_connection is None or lock_connection.closed:
+        from openmcp.database import LeaseLost
+
+        try:
+            if lock_connection is None:
+                raise LeaseLost("No worker lease")
+            lock_connection.assert_held()
+        except LeaseLost:
             raise ProductError("worker_lease_lost", "Treasury worker lock was lost.", 503, True)
-        lock_connection.execute("SELECT 1")
-        lock_connection.commit()
 
     async def purchase(self, row, lock_connection):
         service = Service.model_validate(row["service"])

@@ -4,6 +4,9 @@ import argparse
 import asyncio
 import json
 import logging
+import os
+
+from openmcp.database import DatabaseManager
 
 from .config import ProductSettings, Service
 from .models import ProductError
@@ -15,13 +18,39 @@ from .worker import Worker
 
 async def run(args):
     settings = ProductSettings()
-    settings.validate_startup()
-    store = Store(settings.database_url, settings.database_schema)
-    store.migrate()
-    store.bind_runtime(settings)
     if args.command == "migrate":
+        from .migrate import migrate
+
+        # Privileged DSN is read only by the explicit deployment command.
+        dsn = os.environ.get("OPENMCP_PRODUCT_MIGRATION_DATABASE_URL") or settings.database_url
+        DatabaseManager.validate_dsn(dsn, settings.database_provider)
+        migrate(dsn, settings.database_schema)
         print("Account database migrated.")
         return
+    settings.validate_database()
+    store = Store(DatabaseManager.from_settings(settings))
+    try:
+        store.database.check_schema_version()
+        if args.command == "database-check":
+            print(
+                json.dumps(
+                    {
+                        "status": "ready",
+                        "provider": settings.database_provider,
+                        "schema": settings.database_schema,
+                        **store.health(),
+                    }
+                )
+            )
+            return
+        settings.validate_startup()
+        store.bind_runtime(settings)
+        await run_with_store(args, settings, store)
+    finally:
+        store.close()
+
+
+async def run_with_store(args, settings, store):
     if args.command == "review":
         print(json.dumps(store.review(), default=str))
         return
@@ -101,6 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate")
+    sub.add_parser("database-check")
     sub.add_parser("review")
     worker = sub.add_parser("worker")
     worker.add_argument("--once", action="store_true")

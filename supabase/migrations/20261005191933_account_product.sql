@@ -1,3 +1,11 @@
+-- Account schema only. Clerk remains the identity provider; browsers have no SQL access.
+CREATE SCHEMA IF NOT EXISTS openmcp_product;
+SET LOCAL search_path TO openmcp_product, pg_catalog;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'openmcp_product_runtime') THEN
+        CREATE ROLE openmcp_product_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+    END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS accounts (
     account_id text PRIMARY KEY, clerk_subject text NOT NULL UNIQUE, stripe_customer_id text UNIQUE,
     status text NOT NULL DEFAULT 'active', balance_cents bigint NOT NULL DEFAULT 0,
@@ -69,3 +77,41 @@ CREATE TABLE IF NOT EXISTS runtime_binding (
     singleton integer PRIMARY KEY CHECK(singleton=1), mode text NOT NULL,
     chain_id bigint NOT NULL, token text NOT NULL, treasury_address text
 );
+
+CREATE TABLE IF NOT EXISTS schema_version (
+    singleton integer PRIMARY KEY CHECK(singleton=1), version integer NOT NULL
+);
+INSERT INTO schema_version VALUES(1,1) ON CONFLICT(singleton) DO NOTHING;
+
+-- Each environment has its own NOLOGIN privilege role. Deployment provisions
+-- a separate LOGIN member with a generated password outside migration history.
+REVOKE ALL ON SCHEMA openmcp_product FROM PUBLIC;
+REVOKE ALL ON ALL TABLES IN SCHEMA openmcp_product FROM PUBLIC;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA openmcp_product FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA openmcp_product REVOKE ALL ON TABLES FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA openmcp_product REVOKE ALL ON SEQUENCES FROM PUBLIC;
+GRANT USAGE ON SCHEMA openmcp_product TO openmcp_product_runtime;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA openmcp_product TO openmcp_product_runtime;
+GRANT DELETE ON request_limits TO openmcp_product_runtime;
+REVOKE INSERT, UPDATE ON schema_version FROM openmcp_product_runtime;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA openmcp_product TO openmcp_product_runtime;
+DO $$
+DECLARE r text; t text;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS(SELECT FROM pg_roles WHERE rolname=r) THEN
+            EXECUTE format('REVOKE ALL ON SCHEMA openmcp_product FROM %I',r);
+            EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA openmcp_product FROM %I',r);
+            EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA openmcp_product FROM %I',r);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA openmcp_product REVOKE ALL ON TABLES FROM %I',r);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA openmcp_product REVOKE ALL ON SEQUENCES FROM %I',r);
+        END IF;
+    END LOOP;
+    FOR t IN SELECT tablename FROM pg_tables WHERE schemaname='openmcp_product' LOOP
+        EXECUTE format('ALTER TABLE openmcp_product.%I ENABLE ROW LEVEL SECURITY',t);
+        IF NOT EXISTS(SELECT FROM pg_policies WHERE schemaname='openmcp_product'
+                      AND tablename=t AND policyname='backend_access') THEN
+            EXECUTE format('CREATE POLICY backend_access ON openmcp_product.%I TO openmcp_product_runtime USING(true) WITH CHECK(true)',t);
+        END IF;
+    END LOOP;
+END $$;

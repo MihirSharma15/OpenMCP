@@ -23,10 +23,13 @@ Set the account variables from the root `.env.example` in a private environment 
 
 The local website origin is **`http://localhost:3000`**. Use this exact origin for `OPENMCP_PRODUCT_FRONTEND_URL`, `CLERK_AUTHORIZED_PARTIES`, and frontend `OPENMCP_APP_ORIGIN`. The API origin may be `http://127.0.0.1:8000`. Origin mismatches can prevent session validation, checkout return, or CSRF validation.
 
-Run these in separate terminals with the same backend environment:
+Apply migrations as a separate deployment step. Normal API/worker startup performs no DDL and runs with a restricted runtime login. Export `OPENMCP_PRODUCT_MIGRATION_DATABASE_URL` only for the migration command if that login differs. Database setup and `database-check` do not require Stripe or Clerk configuration. See [Supabase migration and connection details](supabase-migration.md).
+
+Run these with the same runtime environment after migrations:
 
 ```bash
 uv run python -m openmcp.product.cli migrate
+uv run python -m openmcp.product.cli database-check
 uv run openmcp serve --mode account --host 127.0.0.1 --port 8000
 ```
 
@@ -160,4 +163,4 @@ OPENMCP_REQUIRE_POSTGRES=1 OPENMCP_TEST_RESTORE=1 uv run pytest tests/test_produ
 uv run pytest -q
 ```
 
-The database checks must have `OPENMCP_PRODUCT_DATABASE_URL` configured and fail if the database cannot be reached. The restore check additionally requires permission to create a temporary database and either PostgreSQL client tools or the local Compose PostgreSQL service. It uses synthetic funds in a unique schema, restores to a fresh temporary database, runs recovery in a new Python process, verifies the source stayed unchanged, and removes its test databases. It never contacts Stripe or signs a real payment. `.github/workflows/account-mvp.yml` provisions PostgreSQL and requires the accounting suite. In `frontend/`, run `npm test`, `npm run build`, and `npm run typecheck` after installing Clerk. A passing isolated unit suite is not a substitute for PostgreSQL concurrency, browser integration, restore, or bounded live-payment acceptance.
+The database checks must have `OPENMCP_PRODUCT_DATABASE_URL` configured and fail if the database cannot be reached. Use `OPENMCP_DATABASE_PROVIDER=postgres` when overriding a Supabase workspace configuration with local PostgreSQL. The restore check requires CREATEDB only on its restore target and PostgreSQL client tools or the local Compose PostgreSQL service. For a hosted source, set `OPENMCP_TEST_RESTORE_TARGET_DATABASE_URL` to an isolated local database and follow [the Supabase verification procedure](supabase-migration.md). It uses synthetic funds in a unique schema, restores to a fresh temporary database, runs recovery in a new Python process, verifies the source stayed unchanged, and removes its test databases. It never contacts Stripe or signs a real payment. `.github/workflows/account-mvp.yml` provisions PostgreSQL 16 and 17 and requires the accounting suite. In `frontend/`, run `npm test`, `npm run build`, and `npm run typecheck` after installing Clerk. A passing isolated unit suite is not a substitute for PostgreSQL concurrency, browser integration, restore, or bounded live-payment acceptance.

@@ -204,7 +204,7 @@ async def test_journal_precedes_send_and_recovery_reuses_exact_credential(paymen
             ).to_payment_receipt()
         return httpx.Response(200, headers=headers, json={"answer": "real-format test result"})
 
-    lock = Mock(closed=False)
+    lock = Mock(spec=["assert_held"])
     treasury = Treasury(
         settings, store, account=account, method=Signer(), transport=httpx.MockTransport(transport)
     )
@@ -242,7 +242,7 @@ async def test_unknown_signed_payment_blocks_new_signature(payment_setup):
     )
     try:
         with pytest.raises(PendingPayment, match="earlier"):
-            await treasury.purchase(row, Mock(closed=False))
+            await treasury.purchase(row, Mock(spec=["assert_held"]))
         method.create_credential.assert_not_called()
     finally:
         await treasury.close()

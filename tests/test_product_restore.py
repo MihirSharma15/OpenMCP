@@ -35,16 +35,40 @@ def postgres_cli(name, dsn, *args, input=None):
     parts = conninfo_to_dict(dsn)
     binary = shutil.which(name)
     environment = os.environ.copy()
-    if binary:
+    client_container = os.environ.get("OPENMCP_TEST_POSTGRES_CLIENT_CONTAINER")
+    if binary or client_container:
         command = [binary, "--no-password", "--dbname", parts["dbname"]]
         for field, variable in (
             ("host", "PGHOST"),
             ("port", "PGPORT"),
             ("user", "PGUSER"),
             ("password", "PGPASSWORD"),
+            ("sslmode", "PGSSLMODE"),
+            ("sslrootcert", "PGSSLROOTCERT"),
         ):
             if field in parts:
                 environment[variable] = parts[field]
+        if client_container:
+            # Explicit test container only: connection secrets travel through
+            # the child environment, never command arguments or logs.
+            if not client_container.startswith("openmcp-verification-"):
+                pytest.fail("Use a dedicated openmcp-verification-* client container")
+            if environment.get("PGHOST") in {"localhost", "127.0.0.1"}:
+                environment["PGHOST"], environment["PGPORT"] = "127.0.0.1", "5432"
+            if parts.get("sslrootcert"):
+                environment["PGSSLROOTCERT"] = "/tmp/supabase-ca.crt"
+            command = ["docker", "exec", "-i"]
+            for variable in [
+                "PGHOST",
+                "PGPORT",
+                "PGUSER",
+                "PGPASSWORD",
+                "PGSSLMODE",
+                "PGSSLROOTCERT",
+            ]:
+                if variable in environment:
+                    command += ["-e", variable]
+            command += [client_container, name, "--no-password", "--dbname", parts["dbname"]]
     else:
         if not shutil.which("docker"):
             pytest.fail("Restore acceptance requires pg_dump/pg_restore or Docker compose")
@@ -70,14 +94,14 @@ def postgres_cli(name, dsn, *args, input=None):
             parts["dbname"],
         ]
     result = subprocess.run(
-        command + list(args), input=input, capture_output=True, env=environment, timeout=60
+        command + list(args), input=input, capture_output=True, env=environment, timeout=180
     )
     assert result.returncode == 0, f"{name} failed: {result.stderr.decode(errors='replace')}"
     return result.stdout
 
 
 def test_isolated_backup_restore_recovers_signed_and_reserved_work_in_fresh_process(
-    store, service, tmp_path
+    store, service, tmp_path, postgres_url
 ):
     settings = ProductSettings(
         _env_file=None,
@@ -107,20 +131,39 @@ def test_isolated_backup_restore_recovers_signed_and_reserved_work_in_fresh_proc
         }
     )
     backup = postgres_cli(
-        "pg_dump", store.dsn, "--format=custom", "--no-owner", "--no-acl", "--schema", store.schema
+        "pg_dump",
+        postgres_url,
+        "--format=custom",
+        "--no-owner",
+        "--no-acl",
+        "--schema",
+        store.schema,
     )
     artifact = tmp_path / "synthetic-product.dump"
     descriptor = os.open(artifact, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(descriptor, "wb") as handle:
         handle.write(backup)
     restored_database = "product_restore_" + uuid.uuid4().hex
-    parts = conninfo_to_dict(store.dsn)
+    restore_admin = os.environ.get("OPENMCP_TEST_RESTORE_TARGET_DATABASE_URL", postgres_url)
+    parts = conninfo_to_dict(restore_admin)
     restored_dsn = make_conninfo(**(parts | {"dbname": restored_database}))
     created = False
+    created_role = False
+    restored = None
     try:
-        with psycopg.connect(store.dsn, autocommit=True) as admin:
+        with psycopg.connect(restore_admin, autocommit=True) as admin:
             admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(restored_database)))
             created = True
+            # Policies in a schema-only dump refer to its restricted privilege role.
+            if not admin.execute(
+                "SELECT 1 FROM pg_roles WHERE rolname=%s", (store.schema + "_runtime",)
+            ).fetchone():
+                admin.execute(
+                    sql.SQL("CREATE ROLE {} NOLOGIN").format(
+                        sql.Identifier(store.schema + "_runtime")
+                    )
+                )
+                created_role = True
         postgres_cli(
             "pg_restore", restored_dsn, "--exit-on-error", "--no-owner", "--no-acl", input=backup
         )
@@ -148,7 +191,7 @@ class SyntheticStripe:
 class SyntheticProvider:
     @staticmethod
     def ensure_lock(lock):
-        lock.execute("SELECT 1")
+        lock.assert_held()
     async def purchase(self, row, lock):
         if row["payment_authorization"] is None:
             raise TerminalFailure("Synthetic provider refused before signing")
@@ -183,10 +226,16 @@ asyncio.run(Worker(settings, store, SyntheticStripe(), SyntheticProvider()).tick
         assert store.wallet(Principal(owner))["reserved_cents"] == 80
         assert store.execution_internal(signed["execution_id"])["status"] == "payment_pending"
     finally:
+        if restored:
+            restored.close()
         if created:
-            with psycopg.connect(store.dsn, autocommit=True) as admin:
+            with psycopg.connect(restore_admin, autocommit=True) as admin:
                 admin.execute(
                     sql.SQL("DROP DATABASE {} WITH (FORCE)").format(
                         sql.Identifier(restored_database)
                     )
                 )
+                if created_role:
+                    admin.execute(
+                        sql.SQL("DROP ROLE {}").format(sql.Identifier(store.schema + "_runtime"))
+                    )

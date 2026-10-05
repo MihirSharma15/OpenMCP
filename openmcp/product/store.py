@@ -5,40 +5,33 @@ reservations are committed in the same transaction as the purchase record.
 """
 
 import hashlib
-import re
 import secrets
-from contextlib import contextmanager
 from datetime import timedelta
-from pathlib import Path
 
-import psycopg
 from psycopg import sql
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+
+from openmcp.database import DatabaseManager
 
 from .models import Principal, ProductError, fingerprint, identifier, now
 
 
 class Store:
     def __init__(self, dsn, schema="openmcp_product"):
-        if not re.fullmatch(r"[a-z_][a-z0-9_]{0,62}", schema):
-            raise ValueError("Invalid database schema")
-        self.dsn, self.schema = dsn, schema
+        self.database = dsn if isinstance(dsn, DatabaseManager) else DatabaseManager(dsn, schema)
+        self.dsn, self.schema = self.database.dsn, self.database.schema
 
-    @contextmanager
     def connection(self):
-        with psycopg.connect(self.dsn, row_factory=dict_row, connect_timeout=5) as conn:
-            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.schema)))
-            yield conn
+        return self.database.transaction()
 
     def migrate(self):
-        with psycopg.connect(self.dsn, connect_timeout=5) as conn:
-            conn.execute("SELECT pg_advisory_xact_lock(68193421)")
-            conn.execute(
-                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(self.schema))
-            )
-            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.schema)))
-            conn.execute((Path(__file__).parent / "migrations/001_product.sql").read_text())
+        # Explicit operator/test entry point only; never called by API/worker startup.
+        from .migrate import migrate
+
+        migrate(self.dsn, self.schema)
+
+    def close(self):
+        self.database.close()
 
     def bind_runtime(self, settings):
         with self.connection() as c:
@@ -72,20 +65,8 @@ class Store:
                 (address.lower(),),
             )
 
-    @contextmanager
     def worker_lock(self):
-        # Session lock covers signing plus provider HTTP; process death releases it.
-        # A DB disconnect causes the worker to stop before any further signing.
-        with self.connection() as conn:
-            acquired = conn.execute(
-                "SELECT pg_try_advisory_lock(hashtext(%s), 170921) AS acquired", (self.schema,)
-            ).fetchone()["acquired"]
-            conn.commit()
-            try:
-                yield conn if acquired else None
-            finally:
-                if acquired and not conn.closed:
-                    conn.execute("SELECT pg_advisory_unlock(hashtext(%s),170921)", (self.schema,))
+        return self.database.worker_lease()
 
     def rate_limit(self, key, maximum):
         with self.connection() as c:

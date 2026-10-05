@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from jsonschema import Draft202012Validator
 from starlette.exceptions import HTTPException
 
+from openmcp.database import DatabaseManager
+
 from .auth import ClerkVerifier
 from .config import ProductSettings
 from .models import (
@@ -31,21 +33,32 @@ log = logging.getLogger(__name__)
 
 def create_app(settings=None, *, store=None, verifier=None, stripe=None):
     settings = settings or ProductSettings()
+    services = settings.services()
+    owns_store = store is None
     # Dependency injection is only for tests. Normal startup is always validated.
     if store is None:
         settings.validate_startup()
-        store = Store(settings.database_url, settings.database_schema)
-        store.migrate()
-        store.bind_runtime(settings)
+        store = Store(DatabaseManager.from_settings(settings))
+        try:
+            store.database.check_schema_version()
+            store.bind_runtime(settings)
+        except Exception:
+            store.close()
+            raise
     verifier = verifier or ClerkVerifier(settings)
     stripe = stripe or StripeGateway(settings, store)
-    services = settings.services()
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        await verifier.close()
-        await stripe.close()
+        try:
+            yield
+        finally:
+            try:
+                await verifier.close()
+                await stripe.close()
+            finally:
+                if owns_store:
+                    store.close()
 
     app = FastAPI(title="OpenMCP account API", version="1", lifespan=lifespan)
     app.state.store, app.state.stripe = store, stripe

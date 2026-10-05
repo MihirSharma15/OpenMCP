@@ -21,7 +21,9 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from psycopg import sql
+from psycopg.conninfo import conninfo_to_dict
 
+from openmcp.database import DatabaseManager
 from openmcp.product.app import create_app
 from openmcp.product.config import ProductSettings, Service
 from openmcp.product.models import Principal, ProductError, now
@@ -37,7 +39,7 @@ def postgres_url():
         "OPENMCP_PRODUCT_DATABASE_URL", "postgresql://openmcp:openmcp@localhost:5433/openmcp"
     )
     try:
-        with psycopg.connect(url, connect_timeout=2) as connection:
+        with psycopg.connect(url, connect_timeout=10) as connection:
             connection.execute("SELECT 1")
     except psycopg.Error:
         if os.environ.get("OPENMCP_REQUIRE_POSTGRES") == "1":
@@ -53,11 +55,28 @@ def store(postgres_url):
     name = "product_test_" + uuid.uuid4().hex
     value = Store(postgres_url, name)
     value.migrate()
+    runtime_url = os.environ.get("OPENMCP_TEST_RUNTIME_DATABASE_URL")
+    if runtime_url:
+        role = conninfo_to_dict(runtime_url)["user"].split(".")[0]
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute(
+                sql.SQL("GRANT {} TO {}").format(
+                    sql.Identifier(name + "_runtime"), sql.Identifier(role)
+                )
+            )
+        value.close()
+        value = Store(
+            DatabaseManager(
+                runtime_url, name, provider=os.environ.get("OPENMCP_DATABASE_PROVIDER", "postgres")
+            )
+        )
     try:
         yield value
     finally:
+        value.close()
         with psycopg.connect(postgres_url) as connection:
             connection.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(name)))
+            connection.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(name + "_runtime")))
 
 
 @pytest.fixture
@@ -389,7 +408,9 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
         "sub": "user_one",
         "iss": "https://clerk.example",
         "azp": "http://localhost:3000",
-        "exp": int(time.time()) + 120,
+        # Hosted acceptance has many sequential network round trips. Keep this
+        # synthetic identity valid for the journey; expiry has separate tests.
+        "exp": int(time.time()) + 1800,
         "nbf": int(time.time()) - 1,
         "iat": int(time.time()) - 1,
     }

@@ -21,7 +21,7 @@ from openmcp.domain.credits import (
 
 ACCOUNT = "acct-1"
 DEFAULT_DATABASE_URL = "postgresql://openmcp:openmcp@localhost:5433/openmcp"
-DATABASE_URL = os.environ.get("OPENMCP_PRODUCT_DATABASE_URL") or DEFAULT_DATABASE_URL
+DATABASE_URL = os.environ.get("OPENMCP_LEGACY_DATABASE_URL") or DEFAULT_DATABASE_URL
 CARD_MARKERS = ("card", "pan", "cvc", "cvv", "expiry", "last4", "stripe", "secret", "password")
 EXPECTED_COLUMNS = {
     "credit_accounts": ["account_id", "balance_cents"],
@@ -51,7 +51,7 @@ def _postgres_reachable(url: str) -> bool:
 
 pytestmark = pytest.mark.skipif(
     not _postgres_reachable(DATABASE_URL),
-    reason="Postgres is not reachable at OPENMCP_PRODUCT_DATABASE_URL or localhost:5433",
+    reason="Postgres is not reachable at OPENMCP_LEGACY_DATABASE_URL or localhost:5433",
 )
 
 
