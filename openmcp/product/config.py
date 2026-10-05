@@ -217,9 +217,9 @@ class ProductSettings(BaseSettings):
         if not self.clerk_issuer.startswith("https://") or not self.clerk_authorized_parties:
             raise ValueError("CLERK_ISSUER_URL and CLERK_AUTHORIZED_PARTIES are required")
         key = self.stripe_key.get_secret_value()
-        prefix = "sk_live_" if self.mode == "live" else "sk_test_"
-        if not key.startswith(prefix):
-            raise ValueError(f"Stripe secret must match explicit {self.mode} mode")
+        prefixes = (f"sk_{self.mode}_", f"rk_{self.mode}_")
+        if not key.startswith(prefixes):
+            raise ValueError(f"Stripe server key must match explicit {self.mode} mode")
         if not self.stripe_webhook_secret.get_secret_value().startswith("whsec_"):
             raise ValueError("STRIPE_WEBHOOK_SECRET is required")
         if self.chain_id != (4217 if self.mode == "live" else 42431):

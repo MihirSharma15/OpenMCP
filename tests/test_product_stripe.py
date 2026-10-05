@@ -9,10 +9,60 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from openmcp.product.config import ProductSettings
 from openmcp.product.models import ProductError, now
 from openmcp.product.stripe import StripeGateway
+
+
+@pytest.mark.parametrize("mode", ["test", "live"])
+@pytest.mark.parametrize("kind", ["sk", "rk"])
+def test_startup_accepts_server_keys_and_rejects_public_or_wrong_mode(mode, kind, tmp_path):
+    signer = tmp_path / "signer.json"
+    signer.write_text("{}")  # Startup checks presence; no signing occurs in this test.
+    catalog = tmp_path / "services.json"
+    catalog.write_text(
+        json.dumps(
+            [
+                {
+                    "endpoint_id": "fixture",
+                    "name": "Fixture",
+                    "description": "Configuration fixture",
+                    "url": "https://provider.example/execute",
+                    "recipient": "0x1111111111111111111111111111111111111111",
+                    "price_cents": 100,
+                    "input_schema": {"type": "object"},
+                    "enabled": True,
+                    "mode": mode,
+                    "supports_idempotency": True,
+                }
+            ]
+        )
+    )
+    settings = ProductSettings(
+        _env_file=None,
+        mode=mode,
+        database_url="postgresql://fixture@localhost:5432/fixture",
+        database_provider="postgres",
+        clerk_issuer="https://clerk.example",
+        clerk_authorized_parties=["https://app.example"],
+        frontend_url="https://app.example",
+        stripe_key=f"{kind}_{mode}_fixture",
+        stripe_webhook_secret="whsec_fixture",
+        chain_id=4217 if mode == "live" else 42431,
+        token="0x20c000000000000000000000b9537d11c60e8b50",
+        rpc_url="https://rpc.tempo.xyz",
+        explorer_url="https://explore.tempo.xyz",
+        treasury_key_file=signer,
+        catalog_path=catalog,
+    )
+    settings.validate_startup()
+    other_mode = "live" if mode == "test" else "test"
+    for invalid in (f"{kind}_{other_mode}_fixture", f"pk_{mode}_fixture", ""):
+        changed = settings.model_copy(update={"stripe_key": SecretStr(invalid)})
+        with pytest.raises(ValueError, match="Stripe server key"):
+            changed.validate_startup()
 
 
 @pytest.fixture
