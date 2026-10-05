@@ -45,6 +45,7 @@ async def run(args):
             return
         settings.validate_startup()
         store.bind_runtime(settings)
+        store.sync_catalog(settings.catalog())
         await run_with_store(args, settings, store)
     finally:
         store.close()
@@ -55,7 +56,11 @@ async def run_with_store(args, settings, store):
         print(json.dumps(store.review(), default=str))
         return
     if args.command == "doctor":
-        report = {"mode": settings.mode, "services": len(settings.services()), **store.health()}
+        report = {
+            "mode": settings.mode,
+            "services": store.service_count(settings.mode),
+            **store.health(),
+        }
         if args.chain:
             treasury = Treasury(settings, store)
             try:
@@ -66,8 +71,13 @@ async def run_with_store(args, settings, store):
                 await treasury.close()
         print(json.dumps(report))
         return
+    if args.command == "enable-service":
+        store.enable_service(args.endpoint_id)
+        print(json.dumps({"endpoint_id": args.endpoint_id, "enabled": True}))
+        return
     stripe = StripeGateway(settings, store)
     treasury = None
+    worker = None
     try:
         treasury = Treasury(settings, store)
         worker = Worker(settings, store, stripe, treasury)
@@ -124,6 +134,8 @@ async def run_with_store(args, settings, store):
         await stripe.close()
         if treasury:
             await treasury.close()
+        if worker and worker.api_caller:
+            await worker.api_caller.close()
 
 
 def main():
@@ -136,6 +148,8 @@ def main():
     worker.add_argument("--once", action="store_true")
     doctor = sub.add_parser("doctor")
     doctor.add_argument("--chain", action="store_true")
+    enable = sub.add_parser("enable-service", help="Re-enable a service after operator review")
+    enable.add_argument("--endpoint-id", required=True)
     reconcile = sub.add_parser("reconcile")
     reconcile.add_argument("--execution-id", required=True)
     reconcile.add_argument(

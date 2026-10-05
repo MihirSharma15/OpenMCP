@@ -13,6 +13,7 @@ from psycopg.types.json import Jsonb
 
 from openmcp.database import DatabaseManager
 
+from .config import Service
 from .models import Principal, ProductError, fingerprint, identifier, now
 
 
@@ -64,6 +65,74 @@ class Store:
                 "UPDATE runtime_binding SET treasury_address=%s WHERE singleton=1",
                 (address.lower(),),
             )
+
+    def sync_catalog(self, providers):
+        if providers is None:
+            return
+        with self.connection() as c:
+            provider_ids = []
+            endpoint_ids = []
+            for provider in providers:
+                provider_ids.append(provider.provider_id)
+                c.execute(
+                    "INSERT INTO providers(provider_id,name,description,secret_ref) "
+                    "VALUES(%s,%s,%s,%s) ON CONFLICT(provider_id) DO UPDATE SET "
+                    "name=EXCLUDED.name, description=EXCLUDED.description, "
+                    "secret_ref=EXCLUDED.secret_ref",
+                    (
+                        provider.provider_id,
+                        provider.name,
+                        provider.description,
+                        provider.secret_ref,
+                    ),
+                )
+            for provider in providers:
+                for query in provider.queries:
+                    endpoint_ids.append(query.endpoint_id)
+                    c.execute(
+                        "INSERT INTO queries(endpoint_id,provider_id,name,description,price_cents,"
+                        "input_schema,output_schema,url,recipient,enabled,mode,keywords,"
+                        "supports_idempotency,settlement) "
+                        "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                        "ON CONFLICT(endpoint_id) DO UPDATE SET "
+                        "provider_id=EXCLUDED.provider_id, name=EXCLUDED.name, "
+                        "description=EXCLUDED.description, price_cents=EXCLUDED.price_cents, "
+                        "input_schema=EXCLUDED.input_schema, output_schema=EXCLUDED.output_schema, "
+                        "url=EXCLUDED.url, recipient=EXCLUDED.recipient, enabled=EXCLUDED.enabled, "
+                        "mode=EXCLUDED.mode, keywords=EXCLUDED.keywords, "
+                        "supports_idempotency=EXCLUDED.supports_idempotency, "
+                        "settlement=EXCLUDED.settlement",
+                        (
+                            query.endpoint_id,
+                            provider.provider_id,
+                            query.name,
+                            query.description,
+                            query.price_cents,
+                            Jsonb(query.input_schema),
+                            Jsonb(query.output_schema),
+                            query.url,
+                            query.recipient,
+                            query.enabled,
+                            query.mode,
+                            Jsonb(query.keywords),
+                            query.supports_idempotency,
+                            query.settlement,
+                        ),
+                    )
+            self._delete_missing(c, "queries", "endpoint_id", endpoint_ids)
+            self._delete_missing(c, "providers", "provider_id", provider_ids)
+
+    @staticmethod
+    def _delete_missing(connection, table, column, keep):
+        if keep:
+            connection.execute(
+                sql.SQL("DELETE FROM {} WHERE NOT ({} = ANY(%s))").format(
+                    sql.Identifier(table), sql.Identifier(column)
+                ),
+                (keep,),
+            )
+        else:
+            connection.execute(sql.SQL("DELETE FROM {}").format(sql.Identifier(table)))
 
     def worker_lock(self):
         return self.database.worker_lease()
@@ -607,6 +676,20 @@ class Store:
                 (excluding,),
             ).fetchone()
 
+    def mark_sent(self, execution_id):
+        """Journal an API-key call before the POST. A second update does not match."""
+        with self.connection() as c:
+            row = c.execute(
+                "UPDATE executions SET payment_status='sent',status='payment_pending',updated_at=now() "
+                "WHERE execution_id=%s AND payment_status='unsigned' AND status='reserved' "
+                "RETURNING execution_id",
+                (execution_id,),
+            ).fetchone()
+            if not row:
+                raise ProductError(
+                    "payment_journal_conflict", "Payment was already journaled.", 409
+                )
+
     def mark_signed(self, execution_id, authorization, challenge, header_name, payment_hash):
         with self.connection() as c:
             row = c.execute(
@@ -842,3 +925,108 @@ class Store:
                 "worker": bool(alive and alive["alive"]),
                 "needs_review": review,
             }
+
+    def service_count(self, mode):
+        with self.connection() as c:
+            return c.execute(
+                "SELECT count(*) AS n FROM queries WHERE enabled AND mode=%s", (mode,)
+            ).fetchone()["n"]
+
+    def enabled_queries(self, mode):
+        with self.connection() as c:
+            rows = c.execute(
+                "SELECT q.endpoint_id, q.name, q.description, q.price_cents, q.input_schema, "
+                "q.output_schema, q.url, q.recipient, q.enabled, q.mode, q.keywords, "
+                "q.supports_idempotency, q.settlement, q.provider_id, p.name AS provider_name, "
+                "p.description AS provider_description "
+                "FROM queries q JOIN providers p ON p.provider_id=q.provider_id "
+                "WHERE q.enabled AND q.mode=%s",
+                (mode,),
+            ).fetchall()
+        return [
+            {
+                "provider_id": row["provider_id"],
+                "provider_name": row["provider_name"],
+                "provider_description": row["provider_description"],
+                "service": self._as_service(row),
+            }
+            for row in rows
+        ]
+
+    def service(self, endpoint_id, mode):
+        with self.connection() as c:
+            row = c.execute(
+                "SELECT * FROM queries WHERE endpoint_id=%s AND enabled AND mode=%s",
+                (endpoint_id, mode),
+            ).fetchone()
+        return None if row is None else self._as_service(row)
+
+    def catalog_service(self, endpoint_id):
+        with self.connection() as c:
+            row = c.execute("SELECT * FROM queries WHERE endpoint_id=%s", (endpoint_id,)).fetchone()
+        return None if row is None else self._as_service(row)
+
+    @staticmethod
+    def _as_service(row):
+        return Service.model_validate(
+            {
+                "endpoint_id": row["endpoint_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "keywords": row["keywords"],
+                "url": row["url"],
+                "recipient": row["recipient"],
+                "price_cents": row["price_cents"],
+                "input_schema": row["input_schema"],
+                "output_schema": row["output_schema"],
+                "enabled": row["enabled"],
+                "mode": row["mode"],
+                "supports_idempotency": row["supports_idempotency"],
+                "settlement": row["settlement"],
+            }
+        )
+
+    def provider_secret_ref(self, endpoint_id):
+        """Environment variable name for an API-key query. Never the key itself."""
+        with self.connection() as c:
+            row = c.execute(
+                "SELECT p.secret_ref FROM queries q "
+                "JOIN providers p ON p.provider_id=q.provider_id WHERE q.endpoint_id=%s",
+                (endpoint_id,),
+            ).fetchone()
+        if not row or not row["secret_ref"]:
+            return None
+        return row["secret_ref"]
+
+    def disabled_endpoints(self):
+        with self.connection() as c:
+            return {
+                row["endpoint_id"]
+                for row in c.execute("SELECT endpoint_id FROM disabled_services").fetchall()
+            }
+
+    def disable_service(self, endpoint_id, reason):
+        with self.connection() as c:
+            c.execute(
+                "INSERT INTO disabled_services(endpoint_id,reason) VALUES(%s,%s) "
+                "ON CONFLICT(endpoint_id) DO UPDATE SET reason=EXCLUDED.reason,disabled_at=now()",
+                (endpoint_id, reason),
+            )
+
+    def service_disabled(self, endpoint_id):
+        with self.connection() as c:
+            return (
+                c.execute(
+                    "SELECT 1 FROM disabled_services WHERE endpoint_id=%s", (endpoint_id,)
+                ).fetchone()
+                is not None
+            )
+
+    def enable_service(self, endpoint_id):
+        with self.connection() as c:
+            row = c.execute(
+                "DELETE FROM disabled_services WHERE endpoint_id=%s RETURNING endpoint_id",
+                (endpoint_id,),
+            ).fetchone()
+        if row is None:
+            raise ProductError("not_disabled", "That service is not disabled.", 404)

@@ -178,8 +178,12 @@ class Treasury:
             "X-OpenMCP-Execution-ID": row["execution_id"],
         }
         if not row["payment_authorization"]:
-            current = self.settings.services().get(service.endpoint_id)
-            if not current or current.model_dump() != service.model_dump():
+            if self.store.service_disabled(service.endpoint_id):
+                raise TerminalFailure(
+                    "Service is disabled after a confirmed fulfillment failure. Credits returned."
+                )
+            current = self.store.catalog_service(service.endpoint_id)
+            if current is None or current.model_dump() != service.model_dump():
                 raise TerminalFailure(
                     "Service terms changed before settlement. Discover and authorize a new purchase."
                 )

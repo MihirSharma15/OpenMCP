@@ -482,7 +482,7 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
             machine = {"Authorization": "Bearer " + credential["secret"]}
             assert (
                 await client.post("/v1/discover", headers=machine, json={"query": "example"})
-            ).json()["endpoints"][0]["affordable"] is True
+            ).json()["providers"][0]["queries"][0]["affordable"] is True
             first = await client.post(
                 "/v1/execute", headers=machine | {"Idempotency-Key": "buy"}, json=purchase(service)
             )
@@ -535,6 +535,173 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
             ]
     finally:
         await stripe.close()
+
+
+def catalog_query(endpoint_id, name, description, price_cents, *, keywords=None, mode="test"):
+    return {
+        "endpoint_id": endpoint_id,
+        "name": name,
+        "description": description,
+        "keywords": keywords or [],
+        "url": f"https://provider.example/{endpoint_id}",
+        "recipient": "0x" + "12" * 20,
+        "price_cents": price_cents,
+        "input_schema": {"type": "object"},
+        "output_schema": {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        "enabled": True,
+        "mode": mode,
+        "supports_idempotency": True,
+    }
+
+
+class Closable:
+    async def close(self):
+        return None
+
+
+def test_catalog_sync_replaces_rows_without_touching_purchases(store, service, tmp_path):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps([service.model_dump()]))
+    settings = ProductSettings(_env_file=None, catalog_path=catalog)
+    store.sync_catalog(settings.catalog())
+    assert store.catalog_service(service.endpoint_id).model_dump() == service.model_dump()
+    with store.connection() as connection:
+        provider_id = connection.execute(
+            "SELECT provider_id FROM queries WHERE endpoint_id=%s", (service.endpoint_id,)
+        ).fetchone()["provider_id"]
+    assert provider_id == service.endpoint_id
+
+    owner = store.bootstrap("subject")["account_id"]
+    credit(store, owner)
+    principal, _ = grant(store, owner)
+    execution = store.reserve(principal, "keep", purchase(service), service)
+    other = service.model_copy(update={"endpoint_id": "other-service", "name": "Other"})
+    catalog.write_text(json.dumps([other.model_dump()]))
+    store.sync_catalog(ProductSettings(_env_file=None, catalog_path=catalog).catalog())
+    assert store.catalog_service(service.endpoint_id) is None
+    assert store.catalog_service("other-service").name == "Other"
+    saved = store.execution_internal(execution["execution_id"])
+    assert saved["endpoint_id"] == service.endpoint_id
+    assert saved["service"]["price_cents"] == service.price_cents
+
+    store.sync_catalog(None)
+    assert store.service_count("test") == 1
+    catalog.write_text("[]")
+    store.sync_catalog(ProductSettings(_env_file=None, catalog_path=catalog).catalog())
+    assert store.service_count("test") == 0
+    assert store.execution_internal(execution["execution_id"])["endpoint_id"] == service.endpoint_id
+
+
+async def test_discover_groups_queries_under_providers(store, tmp_path):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(
+        json.dumps(
+            [
+                {
+                    "provider_id": "acme",
+                    "name": "Acme Freight",
+                    "description": "Logistics coverage for shippers",
+                    "queries": [
+                        catalog_query("lane-cost", "Lane cost", "Estimates a lane", 80),
+                        catalog_query(
+                            "fleet-size", "Fleet size", "Counts trucks", 25, keywords=["zephyr"]
+                        ),
+                        catalog_query("hidden-lane", "Hidden lane", "Logistics secret", 10),
+                    ],
+                },
+                {
+                    "provider_id": "beta-data",
+                    "name": "Beta Data",
+                    "description": "Secondary source",
+                    "queries": [
+                        catalog_query("zeta-report", "Zeta report", "Monthly totals", 40),
+                        catalog_query("alpha-report", "Alpha report", "Daily totals", 40),
+                    ],
+                },
+                {
+                    "provider_id": "harbor",
+                    "name": "Harbor Watch",
+                    "description": "Port incident history",
+                    "queries": [
+                        catalog_query("storm-risk", "Storm risk", "Weather delays at ports", 60),
+                        catalog_query("live-only", "Live only", "Mainnet coverage", 2, mode="live"),
+                    ],
+                },
+            ]
+        )
+    )
+    app = create_app(
+        ProductSettings(_env_file=None, catalog_path=catalog),
+        store=store,
+        verifier=Closable(),
+        stripe=Closable(),
+    )
+    store.disable_service("hidden-lane", "operator hold")
+    owner = store.bootstrap("subject")["account_id"]
+    credit(store, owner, 30)
+    _, credential = grant(store, owner, 200)
+    headers = {"Authorization": "Bearer " + credential["secret"]}
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://api.example"
+    ) as client:
+
+        async def discover(query, budget=None):
+            body = {"query": query}
+            if budget is not None:
+                body["budget_cents"] = budget
+            response = await client.post("/v1/discover", headers=headers, json=body)
+            assert response.status_code == 200, response.text
+            return response.json()
+
+        listed = await discover("")
+        assert [item["provider_id"] for item in listed["providers"]] == [
+            "acme",
+            "beta-data",
+            "harbor",
+        ]
+        assert [query["endpoint_id"] for query in listed["providers"][0]["queries"]] == [
+            "fleet-size",
+            "lane-cost",
+        ]
+        assert [query["endpoint_id"] for query in listed["providers"][1]["queries"]] == [
+            "alpha-report",
+            "zeta-report",
+        ]
+        flags = {
+            query["endpoint_id"]: query["affordable"]
+            for provider in listed["providers"]
+            for query in provider["queries"]
+        }
+        assert flags["fleet-size"] is True
+        assert flags["lane-cost"] is False
+        assert flags["storm-risk"] is False
+        assert "hidden-lane" not in flags and "live-only" not in flags
+        sample = listed["providers"][0]["queries"][0]
+        assert sample["output_schema"]["type"] == "object"
+        assert "url" not in sample and "recipient" not in sample and "keywords" not in sample
+
+        logistics = await discover("logistics")
+        assert [item["provider_id"] for item in logistics["providers"]] == ["acme"]
+        assert [query["endpoint_id"] for query in logistics["providers"][0]["queries"]] == [
+            "fleet-size",
+            "lane-cost",
+        ]
+
+        daily = await discover("daily")
+        assert [item["provider_id"] for item in daily["providers"]] == ["beta-data"]
+        assert [query["endpoint_id"] for query in daily["providers"][0]["queries"]] == [
+            "alpha-report"
+        ]
+
+        assert (await discover("zephyr"))["providers"] == []
+        tight = await discover("fleet", 20)
+        assert tight["providers"][0]["queries"][0]["endpoint_id"] == "fleet-size"
+        assert tight["providers"][0]["queries"][0]["affordable"] is False
 
 
 def test_test_credits_cannot_be_reused_in_live_mode_or_another_treasury(store):

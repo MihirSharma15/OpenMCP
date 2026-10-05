@@ -19,7 +19,7 @@ from openmcp.product.settlement import PendingPayment, TerminalFailure, Treasury
 
 
 @pytest.fixture
-def payment_setup(tmp_path):
+def payment_setup():
     service = Service(
         endpoint_id="example",
         name="Example",
@@ -32,9 +32,7 @@ def payment_setup(tmp_path):
         mode="test",
         supports_idempotency=True,
     )
-    catalog = tmp_path / "catalog.json"
-    catalog.write_text(json.dumps([service.model_dump()]))
-    settings = ProductSettings(_env_file=None, catalog_path=catalog)
+    settings = ProductSettings(_env_file=None)
     row = {
         "execution_id": "exe_one",
         "service": service.model_dump(),
@@ -123,6 +121,8 @@ async def test_journal_precedes_send_and_recovery_reuses_exact_credential(paymen
     saved = copy.deepcopy(row)
     store = Mock()
     store.uncertain_signed.return_value = None
+    store.service_disabled.return_value = False
+    store.catalog_service.return_value = service
     store.execution_internal.side_effect = lambda _: copy.deepcopy(saved)
 
     def save(identifier, authorization, raw, header, txhash):
@@ -232,9 +232,52 @@ async def test_journal_precedes_send_and_recovery_reuses_exact_credential(paymen
         await treasury.close()
 
 
-async def test_unknown_signed_payment_blocks_new_signature(payment_setup):
+async def test_disabled_service_raises_before_create_credential(payment_setup):
     settings, _, row = payment_setup
     store = Mock()
+    store.service_disabled.return_value = True
+    method = SimpleNamespace(create_credential=Mock())
+    treasury = Treasury(
+        settings, store, account=TempoAccount.from_key(Account.create().key.hex()), method=method
+    )
+    try:
+        with pytest.raises(TerminalFailure, match="disabled"):
+            await treasury.purchase(row, Mock(closed=False))
+        method.create_credential.assert_not_called()
+        store.mark_signed.assert_not_called()
+    finally:
+        await treasury.close()
+
+
+async def test_signed_purchase_still_reconciles_when_service_is_disabled(payment_setup):
+    settings, _, row = payment_setup
+    row = {
+        **row,
+        "payment_authorization": "already-signed",
+        "header_name": "Authorization",
+        "payment_hash": "0xabc",
+    }
+    store = Mock()
+    store.service_disabled.return_value = True
+    treasury = Treasury(
+        settings,
+        store,
+        account=TempoAccount.from_key(Account.create().key.hex()),
+        transport=httpx.MockTransport(lambda _request: httpx.Response(503)),
+    )
+    try:
+        with pytest.raises(PendingPayment):
+            await treasury.purchase(row, Mock(closed=False))
+        store.service_disabled.assert_not_called()
+    finally:
+        await treasury.close()
+
+
+async def test_unknown_signed_payment_blocks_new_signature(payment_setup):
+    settings, service, row = payment_setup
+    store = Mock()
+    store.service_disabled.return_value = False
+    store.catalog_service.return_value = service
     store.uncertain_signed.return_value = {"execution_id": "earlier"}
     method = SimpleNamespace(create_credential=Mock())
     treasury = Treasury(
@@ -243,6 +286,26 @@ async def test_unknown_signed_payment_blocks_new_signature(payment_setup):
     try:
         with pytest.raises(PendingPayment, match="earlier"):
             await treasury.purchase(row, Mock(spec=["assert_held"]))
+        method.create_credential.assert_not_called()
+    finally:
+        await treasury.close()
+
+
+@pytest.mark.parametrize("current", [None, "changed"])
+async def test_terms_check_reads_the_stored_query(payment_setup, current):
+    settings, service, row = payment_setup
+    store = Mock()
+    store.service_disabled.return_value = False
+    store.catalog_service.return_value = (
+        None if current is None else service.model_copy(update={"price_cents": 80})
+    )
+    method = SimpleNamespace(create_credential=Mock())
+    treasury = Treasury(
+        settings, store, account=TempoAccount.from_key(Account.create().key.hex()), method=method
+    )
+    try:
+        with pytest.raises(TerminalFailure, match="terms changed"):
+            await treasury.purchase(row, Mock(closed=False))
         method.create_credential.assert_not_called()
     finally:
         await treasury.close()

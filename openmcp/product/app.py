@@ -31,9 +31,58 @@ from .stripe import StripeGateway
 log = logging.getLogger(__name__)
 
 
+def _catalog_match(words, *parts):
+    if not words:
+        return True
+    corpus = " ".join(parts).lower()
+    return any(word in corpus for word in words)
+
+
+def discover_providers(rows, words, ceiling, active):
+    groups = {}
+    for row in rows:
+        group = groups.get(row["provider_id"])
+        if group is None:
+            group = {
+                "provider_id": row["provider_id"],
+                "name": row["provider_name"],
+                "description": row["provider_description"],
+                "provider_match": _catalog_match(
+                    words, row["provider_name"], row["provider_description"]
+                ),
+                "services": [],
+            }
+            groups[row["provider_id"]] = group
+        group["services"].append(row["service"])
+    providers = []
+    for group in groups.values():
+        included = [
+            service
+            for service in group["services"]
+            if group["provider_match"] or _catalog_match(words, service.name, service.description)
+        ]
+        if not included:
+            continue
+        included.sort(key=lambda service: (service.price_cents, service.endpoint_id))
+        providers.append(
+            {
+                "provider_id": group["provider_id"],
+                "name": group["name"],
+                "description": group["description"],
+                "queries": [
+                    service.public() | {"affordable": active and service.price_cents <= ceiling}
+                    for service in included
+                ],
+            }
+        )
+    providers.sort(
+        key=lambda provider: (provider["queries"][0]["price_cents"], provider["provider_id"])
+    )
+    return providers
+
+
 def create_app(settings=None, *, store=None, verifier=None, stripe=None):
     settings = settings or ProductSettings()
-    services = settings.services()
     owns_store = store is None
     # Dependency injection is only for tests. Normal startup is always validated.
     if store is None:
@@ -42,9 +91,12 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
         try:
             store.database.check_schema_version()
             store.bind_runtime(settings)
+            store.sync_catalog(settings.catalog())
         except Exception:
             store.close()
             raise
+    else:
+        store.sync_catalog(settings.catalog())
     verifier = verifier or ClerkVerifier(settings)
     stripe = stripe or StripeGateway(settings, store)
 
@@ -279,20 +331,16 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
         affordable = min(wallet["available_cents"], allowance)
         if body.budget_cents is not None:
             affordable = min(affordable, body.budget_cents)
-        words = body.query.lower().split()
-        matches = []
-        for service in services.values():
-            corpus = " ".join([service.name, service.description, *service.keywords]).lower()
-            if not words or any(word in corpus for word in words):
-                matches.append(
-                    service.public()
-                    | {
-                        "affordable": service.price_cents <= affordable
-                        and wallet["status"] == "active"
-                    }
-                )
+        disabled = store.disabled_endpoints()
+        rows = [
+            row
+            for row in store.enabled_queries(settings.mode)
+            if row["service"].endpoint_id not in disabled
+        ]
         return {
-            "endpoints": matches,
+            "providers": discover_providers(
+                rows, body.query.lower().split(), affordable, wallet["status"] == "active"
+            ),
             "available_cents": wallet["available_cents"],
             "remaining_allowance_cents": allowance,
             "discovery_is_free": True,
@@ -306,7 +354,7 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
         if old:
             row = old
         else:
-            service = services.get(body.endpoint_id)
+            service = store.service(body.endpoint_id, settings.mode)
             if not service:
                 raise ProductError("not_found", "Enabled service not found.", 404)
             if next(Draft202012Validator(service.input_schema).iter_errors(body.payload), None):

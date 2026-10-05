@@ -77,6 +77,27 @@ CREATE TABLE IF NOT EXISTS runtime_binding (
     singleton integer PRIMARY KEY CHECK(singleton=1), mode text NOT NULL,
     chain_id bigint NOT NULL, token text NOT NULL, treasury_address text
 );
+CREATE TABLE IF NOT EXISTS disabled_services (
+    endpoint_id text PRIMARY KEY,
+    reason text NOT NULL,
+    disabled_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS providers (
+    provider_id text PRIMARY KEY, name text NOT NULL, description text NOT NULL
+);
+CREATE TABLE IF NOT EXISTS queries (
+    endpoint_id text PRIMARY KEY, provider_id text NOT NULL REFERENCES providers,
+    name text NOT NULL, description text NOT NULL, price_cents bigint NOT NULL,
+    input_schema jsonb NOT NULL, output_schema jsonb NOT NULL, url text NOT NULL,
+    recipient text NOT NULL, enabled boolean NOT NULL, mode text NOT NULL,
+    keywords jsonb NOT NULL DEFAULT '[]'::jsonb,
+    supports_idempotency boolean NOT NULL DEFAULT true
+);
+-- Later columns ship as alters: this file is reapplied with IF NOT EXISTS and does not edit existing tables.
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS settlement text NOT NULL DEFAULT 'mpp';
+ALTER TABLE queries DROP CONSTRAINT IF EXISTS queries_settlement_check;
+ALTER TABLE queries ADD CONSTRAINT queries_settlement_check CHECK (settlement IN ('mpp', 'api_key'));
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS secret_ref text;
 
 CREATE TABLE IF NOT EXISTS schema_version (
     singleton integer PRIMARY KEY CHECK(singleton=1), version integer NOT NULL
@@ -93,6 +114,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA openmcp_product REVOKE ALL ON SEQUENCES FROM 
 GRANT USAGE ON SCHEMA openmcp_product TO openmcp_product_runtime;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA openmcp_product TO openmcp_product_runtime;
 GRANT DELETE ON request_limits TO openmcp_product_runtime;
+GRANT DELETE ON queries, providers, disabled_services TO openmcp_product_runtime;
 REVOKE INSERT, UPDATE ON schema_version FROM openmcp_product_runtime;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA openmcp_product TO openmcp_product_runtime;
 DO $$

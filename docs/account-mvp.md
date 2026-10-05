@@ -54,32 +54,75 @@ The frontend uses Clerk sign-in/sign-up and sends session tokens through a narro
 
 Stripe Checkout collects payment details on Stripe. Enable Link in the Stripe account's payment-method settings; availability follows Stripe's dynamic payment-method rules. Create the webhook endpoint at `https://YOUR_API_ORIGIN/v1/webhooks/stripe` and subscribe to the events listed in the root `.env.example`. For local testing, forward Stripe test events to that same route with the Stripe CLI and configure the forwarding endpoint's signing secret. Credit is created only after verified Stripe reconciliation, never from the browser's success or cancellation query. See [Stripe's Checkout fulfillment contract](https://docs.stripe.com/checkout/fulfillment) and [Link in Checkout](https://docs.stripe.com/payments/link/checkout-link).
 
-`OPENMCP_PRODUCT_CATALOG` points to a JSON array of approved services. There is no user-submitted URL or self-service provider onboarding in this iteration. A disabled example:
+`OPENMCP_PRODUCT_CATALOG` points to a JSON array of approved providers. Each provider has `provider_id`, `name`, `description`, and `queries`. There is no user-submitted URL or self-service provider onboarding in this iteration. A flat array of services is still accepted: each service is stored as its own provider, using that service's endpoint id, name, and description. Discovery matches the caller's words against provider and query names and descriptions. Keywords are stored with the query and are not search terms. A disabled example:
 
 ```json
 [
   {
-    "endpoint_id": "approved-service",
-    "name": "Approved service",
-    "description": "Describe the real result and when an LLM should buy it.",
-    "keywords": ["research"],
-    "url": "https://YOUR_PROVIDER_ORIGIN/paid-tool",
-    "recipient": "0x0000000000000000000000000000000000000000",
-    "price_cents": 40,
-    "input_schema": {
-      "type": "object",
-      "properties": {"query": {"type": "string"}},
-      "required": ["query"],
-      "additionalProperties": false
-    },
-    "enabled": false,
-    "mode": "test",
-    "supports_idempotency": true
+    "provider_id": "approved-provider",
+    "name": "Approved provider",
+    "description": "Who publishes these queries and what they cover.",
+    "queries": [
+      {
+        "endpoint_id": "approved-service",
+        "name": "Approved service",
+        "description": "Describe the real result and when an LLM should buy it.",
+        "keywords": ["research"],
+        "url": "https://YOUR_PROVIDER_ORIGIN/paid-tool",
+        "recipient": "0x0000000000000000000000000000000000000000",
+        "settlement": "mpp",
+        "price_cents": 40,
+        "input_schema": {
+          "type": "object",
+          "properties": {"query": {"type": "string"}},
+          "required": ["query"],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {"answer": {"type": "string"}},
+          "required": ["answer"],
+          "additionalProperties": false
+        },
+        "enabled": false,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
+  },
+  {
+    "provider_id": "approved-api",
+    "name": "Approved API provider",
+    "description": "Who publishes this HTTP API and what it returns.",
+    "secret_ref": "APPROVED_API_KEY",
+    "queries": [
+      {
+        "endpoint_id": "approved-api-search",
+        "name": "Approved API search",
+        "description": "Describe the real result and when an LLM should buy it.",
+        "keywords": ["search"],
+        "url": "https://YOUR_PROVIDER_ORIGIN/search",
+        "settlement": "api_key",
+        "price_cents": 40,
+        "input_schema": {
+          "type": "object",
+          "properties": {"query": {"type": "string"}},
+          "required": ["query"],
+          "additionalProperties": false
+        },
+        "output_schema": {"type": "object"},
+        "enabled": false,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
   }
 ]
 ```
 
-Replace every placeholder and confirm the provider's replay behavior before enabling it. At a 40-cent retail price, its MPP challenge must request 36 cents. It must bind the body digest and execution memo, accept the forwarded execution/idempotency ID, and replay the same paid credential's receipt and result. The existing provider package demonstrates that protocol; its fictional demo services do not constitute a live provider. Restart the API after catalog changes. The worker checks current catalog terms before signing and retains immutable terms for already signed payments.
+`settlement` defaults to `mpp`. An MPP query needs the provider's Tempo recipient. An `api_key` query does not: its provider sets `secret_ref` to an environment variable name, and that variable holds the bearer token. The catalog file never contains the token. The name is stored on the provider row only and is not copied onto purchases or discovery responses. The worker reads the variable when it POSTs. Private, link-local, and non-test localhost URLs are rejected. Hostnames are not resolved; DNS rebinding is out of scope. Test mode may use a loopback URL for a local adapter.
+
+Replace every placeholder and confirm the provider's replay behavior before enabling it. At a 40-cent retail price, an MPP challenge must request 36 cents. It must bind the body digest and execution memo, accept the forwarded execution/idempotency ID, and replay the same paid credential's receipt and result. The existing provider package demonstrates that protocol; its fictional demo services do not constitute a live provider. An API-key query charges the same retail price and does not add a second vendor fee. Restart the API and worker after catalog changes. Startup copies the file into the account database and drops catalog rows that are no longer listed. Purchases keep the terms saved on the execution. The worker checks current catalog terms before signing an MPP payment and retains immutable terms for already signed payments.
 
 Test configuration defaults to Tempo testnet. Live mode requires explicit production settings, the supported mainnet USDC address, an enabled HTTPS live provider and a private treasury key; see the root `.env.example` and [Tempo's SDK network/token definitions](https://github.com/tempoxyz/pympp/blob/main/src/mpp/methods/tempo/_defaults.py). Configure the signer as either a raw private hex key or JSON containing `private_key`, in an owner-only regular file (`chmod 600`). Never pass the key through the browser, account API, MCP client, or command arguments.
 

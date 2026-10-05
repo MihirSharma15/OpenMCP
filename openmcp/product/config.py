@@ -1,6 +1,8 @@
 """Explicit account configuration; never inherits the demo signer or catalog."""
 
+import ipaddress
 import json
+import re
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -10,6 +12,55 @@ from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_SECRET_REF = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+_LOCALHOST_NAMES = {"localhost", "localhost.localdomain"}
+
+
+def validate_service_url(url, mode):
+    """Reject private, link-local, and localhost targets written into the URL.
+
+    DNS rebinding is out of scope: hostnames are not resolved. Only IP literals
+    and localhost names are classified. Test mode may use loopback
+    (127.0.0.0/8, ::1, and localhost) so a local adapter can run. Live mode
+    still requires a public HTTPS URL.
+    """
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+    ):
+        raise ValueError("Service URL must be an absolute HTTP(S) URL without user info")
+    if mode == "live" and parsed.scheme != "https":
+        raise ValueError("Live services require HTTPS")
+    if _blocked_service_host(parsed.hostname, mode):
+        raise ValueError("Service URL must not target a private, link-local, or localhost address")
+    return url
+
+
+def _blocked_service_host(hostname, mode):
+    name = hostname.lower().rstrip(".")
+    if name in _LOCALHOST_NAMES or name.endswith(".localhost"):
+        return mode != "test"
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+        address = address.ipv4_mapped
+    if address.is_loopback:
+        return mode != "test"
+    return (
+        address.is_private
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+        or not address.is_global
+    )
+
 
 class Service(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -18,9 +69,11 @@ class Service(BaseModel):
     description: str = Field(min_length=1, max_length=1000)
     keywords: list[str] = []
     url: str
-    recipient: str
+    recipient: str = ""
+    settlement: Literal["mpp", "api_key"] = "mpp"
     price_cents: int = Field(ge=2, le=1_000_000)
     input_schema: dict
+    output_schema: dict = Field(default_factory=lambda: {"type": "object"})
     enabled: bool = False
     mode: Literal["test", "live"]
     # The provider must replay the same result for the same execution ID.
@@ -32,14 +85,14 @@ class Service(BaseModel):
 
     @model_validator(mode="after")
     def validate_service(self):
-        url = urlsplit(self.url)
-        if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.fragment:
-            raise ValueError("Service URL must be an absolute HTTP(S) URL without user info")
-        if self.mode == "live" and url.scheme != "https":
-            raise ValueError("Live services require HTTPS")
-        if not is_address(self.recipient):
+        validate_service_url(self.url, self.mode)
+        if self.settlement == "mpp":
+            if not is_address(self.recipient):
+                raise ValueError("Invalid provider recipient")
+        elif self.recipient and not is_address(self.recipient):
             raise ValueError("Invalid provider recipient")
         Draft202012Validator.check_schema(self.input_schema)
+        Draft202012Validator.check_schema(self.output_schema)
         return self
 
     def public(self):
@@ -52,7 +105,32 @@ class Service(BaseModel):
             "platform_fee_cents": self.price_cents - self.provider_price_cents,
             "currency": "usd_credits",
             "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
         }
+
+
+class Provider(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider_id: str = Field(pattern=r"^[a-z0-9-]{1,100}$")
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=1000)
+    secret_ref: str | None = None
+    queries: list[Service]
+
+    @model_validator(mode="after")
+    def validate_provider(self):
+        ref = None if self.secret_ref is None else self.secret_ref.strip()
+        if ref == "":
+            ref = None
+        elif ref is not None and not _SECRET_REF.fullmatch(ref):
+            raise ValueError("secret_ref must be an environment variable name, not the API key")
+        self.secret_ref = ref
+        for query in self.queries:
+            if query.settlement == "api_key" and not ref:
+                raise ValueError("API-key queries require a provider secret_ref")
+            if query.settlement == "mpp" and not is_address(query.recipient):
+                raise ValueError("Invalid provider recipient")
+        return self
 
 
 class ProductSettings(BaseSettings):
@@ -93,13 +171,45 @@ class ProductSettings(BaseSettings):
     max_attempts: int = Field(default=5, ge=1, le=20, alias="OPENMCP_PRODUCT_MAX_ATTEMPTS")
     top_up_presets_cents: tuple[int, ...] = (500, 1000, 2500, 5000)
 
-    def services(self):
-        items = [] if self.catalog_path is None else json.loads(self.catalog_path.read_text())
-        services = [Service.model_validate(item) for item in items]
-        if len({item.endpoint_id for item in services}) != len(services):
+    def catalog(self):
+        """Operator catalog file. None means startup must leave stored rows alone."""
+        if self.catalog_path is None:
+            return None
+        items = json.loads(self.catalog_path.read_text())
+        if not isinstance(items, list):
+            raise ValueError("Catalog must be a JSON array")
+        flat = bool(items) and all(
+            isinstance(item, dict) and "endpoint_id" in item and "queries" not in item
+            for item in items
+        )
+        if flat:
+            services = [Service.model_validate(item) for item in items]
+            providers = [
+                Provider(
+                    provider_id=service.endpoint_id,
+                    name=service.name,
+                    description=service.description,
+                    queries=[service],
+                )
+                for service in services
+            ]
+        else:
+            providers = [Provider.model_validate(item) for item in items]
+        provider_ids = [provider.provider_id for provider in providers]
+        endpoint_ids = [query.endpoint_id for provider in providers for query in provider.queries]
+        if len(set(provider_ids)) != len(provider_ids):
+            raise ValueError("Provider IDs must be unique")
+        if len(set(endpoint_ids)) != len(endpoint_ids):
             raise ValueError("Service IDs must be unique")
+        return providers
+
+    def services(self):
+        providers = self.catalog() or []
         return {
-            item.endpoint_id: item for item in services if item.enabled and item.mode == self.mode
+            query.endpoint_id: query
+            for provider in providers
+            for query in provider.queries
+            if query.enabled and query.mode == self.mode
         }
 
     def validate_startup(self):
