@@ -86,7 +86,8 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
     owns_store = store is None
     # Dependency injection is only for tests. Normal startup is always validated.
     if store is None:
-        settings.validate_startup()
+        # Only the payment worker signs transfers; the API never needs its key.
+        settings.validate_startup(require_treasury_key=False)
         store = Store(DatabaseManager.from_settings(settings))
         try:
             store.database.check_schema_version()

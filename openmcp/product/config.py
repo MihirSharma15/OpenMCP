@@ -212,7 +212,7 @@ class ProductSettings(BaseSettings):
             if query.enabled and query.mode == self.mode
         }
 
-    def validate_startup(self):
+    def validate_startup(self, *, require_treasury_key=True):
         self.validate_database()
         if not self.clerk_issuer.startswith("https://") or not self.clerk_authorized_parties:
             raise ValueError("CLERK_ISSUER_URL and CLERK_AUTHORIZED_PARTIES are required")
@@ -239,7 +239,9 @@ class ProductSettings(BaseSettings):
             ]
             if not all(url.startswith("https://") for url in urls):
                 raise ValueError("Live origins, explorer and RPC must use HTTPS")
-            if not self.treasury_key_file or not self.treasury_key_file.is_file():
+            if require_treasury_key and (
+                not self.treasury_key_file or not self.treasury_key_file.is_file()
+            ):
                 raise ValueError("Live mode needs a private treasury key file")
             if not self.services():
                 raise ValueError("Live mode needs an explicitly enabled live provider")

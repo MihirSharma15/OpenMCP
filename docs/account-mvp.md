@@ -37,7 +37,7 @@ uv run openmcp serve --mode account --host 127.0.0.1 --port 8000
 uv run python -m openmcp.product.cli worker
 ```
 
-The worker processes both durable Stripe events and purchases. At most one worker per account schema obtains the treasury lock. The treasury key must belong exclusively to this deployment; sharing a signer between independent schemas or external senders would invalidate the single nonce-stream assumption. The API refuses new purchases when the worker heartbeat is stale.
+The worker processes both durable Stripe events and purchases. At most one worker per account schema obtains the treasury lock. Store the treasury private key only on the worker host (Render); the account API (Vercel) and frontend do not need `OPENMCP_TREASURY_KEY_FILE` or the key file. Both the API and worker still validate the same mode, chain, token, and approved service catalog. The treasury key must belong exclusively to this deployment; sharing a signer between independent schemas or external senders would invalidate the single nonce-stream assumption. The API refuses new purchases when the worker heartbeat is stale.
 
 In `frontend/`, configure the variables in `.env.example`, install dependencies, and start Next.js:
 
