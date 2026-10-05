@@ -24,6 +24,9 @@ creator = ["playwright>=1.51,<2"]
 [project.scripts]
 openmcp = "openmcp.cli:main"
 
+[tool.vercel]
+entrypoint = "openmcp.product.vercel:app"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

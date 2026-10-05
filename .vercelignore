@@ -1,0 +1,14 @@
+# Only package code and dependency/build metadata belong in the API deployment.
+/*
+!pyproject.toml
+!uv.lock
+!vercel.json
+!README.md
+!openmcp
+!openmcp_provider
+!openmcp_creator
+**/__pycache__/**
+**/*.pyc
+**/.env*
+**/*.sqlite*
+**/*.db

@@ -47,6 +47,25 @@ Open `http://localhost:3000/dashboard`. The required Clerk setup follows [Clerk'
 
 The frontend uses Clerk sign-in/sign-up and sends session tokens through a narrow same-origin API proxy. FastAPI verifies the configured issuer, RS256 signature, expiry and authorized party. Clerk user IDs are namespaced by issuer. Browser and agent credentials have separate permissions.
 
+**Deploy the HTTP API to Vercel**
+
+The account HTTP API is hosted at https://openmcp-api.vercel.app in the `openmcp-api` project under `mihirsharma15s-projects`. The frontend is the separate `openmcp` project at https://openmcp.vercel.app. Vercel-issued project domains end in `.vercel.app`; `api.openmcp.vercel.com` is not an available domain in this account.
+
+Deploy the backend from the repository root, using the explicit project name:
+
+```bash
+vercel deploy --dry --format=json --project openmcp-api --scope mihirsharma15s-projects
+vercel deploy --prod --yes --project openmcp-api --scope mihirsharma15s-projects
+```
+
+`vercel.json` selects FastAPI and `pyproject.toml` points to `openmcp.product.vercel:app`. The backend upload allowlist excludes local environment files, wallets, databases, tests and frontend artifacts. The frontend has its own `.vercelignore` so it does not inherit the backend allowlist. Building the backend does not connect to the database; account initialization runs during the function lifespan. The hosted entrypoint reads only Vercel environment variables and never loads a local `.env` file.
+
+On October 5, 2026, the first deployment was verified with HTTP 200 from `/health/live` and HTTP 503 (`backend_not_configured`) from `/health/ready` and `/v1/wallet`. Its Vercel deployment target is production, but `OPENMCP_PRODUCT_MODE=test` remains explicit. Vercel's Ready deployment status confirms that the code was published, not that payments are operational.
+
+The hosted website origin and existing development Clerk issuer/authorized party are configured. The project still needs `OPENMCP_PRODUCT_DATABASE_URL`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` supplied privately before account initialization can succeed. Configure the service catalog and separate payment worker before purchasing. Changing a Vercel environment variable requires a new deployment. `/health/live` checks the HTTP process only; readiness requires the real account API, database and worker. Missing configuration returns 503 for all account operations and never acknowledges Stripe events or substitutes demo balances.
+
+This deployment runs the HTTP API only. The continuous `openmcp.product.cli worker` process must run separately with the same database and product settings; it is not launched inside a Vercel request. Once the backend is configured, set frontend `OPENMCP_API_URL` and `OPENMCP_PUBLIC_API_URL` to `https://openmcp-api.vercel.app` and `OPENMCP_APP_ORIGIN` to `https://openmcp.vercel.app`, then redeploy the frontend.
+
 **Configure funding and services**
 
 Stripe Checkout collects payment details on Stripe. Enable Link in the Stripe account's payment-method settings; availability follows Stripe's dynamic payment-method rules. Create the webhook endpoint at `https://YOUR_API_ORIGIN/v1/webhooks/stripe` and subscribe to the events listed in the root `.env.example`. For local testing, forward Stripe test events to that same route with the Stripe CLI and configure the forwarding endpoint's signing secret. Credit is created only after verified Stripe reconciliation, never from the browser's success or cancellation query. See [Stripe's Checkout fulfillment contract](https://docs.stripe.com/checkout/fulfillment) and [Link in Checkout](https://docs.stripe.com/payments/link/checkout-link).
