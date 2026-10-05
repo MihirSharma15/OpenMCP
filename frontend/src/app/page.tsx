@@ -13,7 +13,7 @@ export default function Home() {
         <div className="nav-links">
           <a href="#how">For agents</a>
           <a href="#services">For APIs</a>
-          <a href="#endpoints">Docs</a>
+          <a href="#endpoints">Agent tools</a>
           <AuthControls enabled={clerkConfigured()} />
         </div>
       </nav>
@@ -25,7 +25,7 @@ export default function Home() {
           <p className="hero-description">Fund one wallet. Give your AI agent a spending limit. Let it discover useful services, pay per request, and bring the results back. Every purchase and refund in one place.</p>
           <div className="hero-actions">
             <Link href="/dashboard" className="button">Open your wallet</Link>
-            <Link href="/demo" className="text-link">Watch an agent pay for data</Link>
+            <Link href="/dashboard/agents" className="text-link">Connect your agent</Link>
           </div>
         </section>
 
@@ -48,28 +48,29 @@ export default function Home() {
 
         <section id="endpoints" className="endpoints-section container section-space">
           <div className="section-heading">
-            <div className="eyebrow">The skill</div>
-            <h2>Three endpoints.</h2>
+            <div className="eyebrow">Your agent’s toolkit</div>
+            <h2>Find it. Buy it. Follow the result.</h2>
           </div>
           <div className="endpoint-grid">
-            <div><span className="mono">/discover</span><span className="muted">Send a goal and a budget. Get back endpoints that satisfy it, with prices.</span></div>
-            <div><span className="mono">/execute</span><span className="muted">Buy a service within your spending allowance. OpenMCP pays the provider and returns the result.</span></div>
-            <div><span className="mono">/balance</span><span className="muted">Check how much of the budget the agent has left.</span></div>
+            <div><span className="mono">discover</span><span className="muted">Find registered services and review their inputs and prices before buying.</span></div>
+            <div><span className="mono">execute</span><span className="muted">Buy a service within your spending allowance. OpenMCP pays the provider and returns the result.</span></div>
+            <div><span className="mono">balance</span><span className="muted">Check your wallet’s available funds and your agent’s remaining allowance.</span></div>
+            <div><span className="mono">execution_status</span><span className="muted">Follow a pending purchase and retrieve its result or confirmed refund.</span></div>
           </div>
         </section>
 
-        <section className="demo-callout container">
+        <section className="account-callout container">
           <div className="callout-copy">
-            <div className="eyebrow accent">Demo</div>
-            <h2>Watch an agent run due diligence with a $15 budget.</h2>
-            <p className="muted">Three services, three payments, one report on FreightFlow. Every cent is visible as it moves.</p>
-            <Link href="/demo" className="button">Open the demo</Link>
+            <div className="eyebrow accent">Your workspace</div>
+            <h2>Your wallet. Your limits. Every transaction.</h2>
+            <p className="muted">Manage your balance, give each agent a spending allowance, and follow its purchases from request to result.</p>
+            <Link href="/dashboard" className="button">Go to your dashboard</Link>
           </div>
-          <div className="payment-preview" role="table" aria-label="Example service payments">
-            <div className="payment-preview-header" role="row"><span role="columnheader">Payment</span><span role="columnheader">Charged</span><span role="columnheader">Provider</span></div>
-            <div className="payment-preview-row fresh" role="row"><span role="cell">Legal liabilities</span><span role="cell">$6.00</span><span role="cell">$5.70</span></div>
-            <div className="payment-preview-row" role="row"><span role="cell">Operational health</span><span role="cell">$4.00</span><span role="cell">$3.80</span></div>
-          </div>
+          <nav className="workspace-links" aria-label="Your workspace">
+            <Link href="/dashboard"><strong>Wallet</strong><span>View your balance and add money</span></Link>
+            <Link href="/dashboard/agents"><strong>Agents</strong><span>Set allowances and manage access</span></Link>
+            <Link href="/dashboard/transactions"><strong>Transactions</strong><span>Review purchases, results, and refunds</span></Link>
+          </nav>
         </section>
       </main>
 

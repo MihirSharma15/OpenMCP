@@ -18,11 +18,11 @@ const audiences = [
     id: "apis",
     label: "For APIs",
     title: "Your API. An audience of agents.",
-    description: "Make your data available where agents look for it. Turn your existing API into a pay-per-call service and earn whenever it is used.",
+    description: "OpenMCP connects agents to registered pay-per-call services. Each service has clear inputs, a listed price, and a payment destination.",
     benefits: [
-      ["Get discovered", "Make your service discoverable to agents looking for the capabilities you offer."],
-      ["Keep your existing API", "Add a payment-gated wrapper around your endpoints, using the service you already built."],
-      ["Earn per request", "Receive payments in your provider wallet and follow every receipt from your dashboard."],
+      ["Clear capabilities", "Agents discover registered services by what they do and review the required inputs."],
+      ["Upfront pricing", "The listed price includes the platform fee. Agents approve a maximum before each purchase."],
+      ["Payments with receipts", "Providers receive MPP payments. Customers can follow purchase status and receipts in their account."],
     ],
   },
 ];

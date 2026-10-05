@@ -14,7 +14,15 @@ if (
 const nextConfig: NextConfig = {
   devIndicators: false,
   turbopack: { root: process.cwd() },
+  async redirects() {
+    // The hosted product serves account pages; legacy observers remain local.
+    return process.env.VERCEL === "1" ? [
+      { source: "/demo/:path*", destination: "/dashboard", permanent: true },
+      { source: "/providers/:path*", destination: "/dashboard", permanent: true },
+    ] : [];
+  },
   rewrites() {
+    if (process.env.VERCEL === "1") return [];
     return [
       {
         source: "/api/runner/:path*",

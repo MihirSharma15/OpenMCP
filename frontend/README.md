@@ -57,6 +57,22 @@ origin checks alongside existing demo/provider tests. Full browser and build
 checks require the Clerk package to be installed and the external services to
 be configured; no development auth substitute is included.
 
+## Vercel deployment
+
+The hosted frontend is https://openmcp.vercel.app, in the `openmcp` project under
+`mihirsharma15s-projects`. Deploy from `frontend/` with
+`vercel deploy --prod --scope mihirsharma15s-projects`.
+
+Clerk is connected using the existing development application. A production
+Clerk instance and custom domain remain separate launch setup. Configure the
+hosted account backend through `OPENMCP_API_URL` and `OPENMCP_PUBLIC_API_URL`,
+then redeploy. The account service must allow the website's exact HTTPS origin.
+Without that backend, sign-in works but wallet and payment operations remain
+unavailable; the website does not substitute demo balances.
+
+On Vercel, `/demo` and `/providers` redirect to `/dashboard`, and the local
+`/api/runner/*` proxy is disabled. The homepage links to account features.
+
 ## Existing local demo
 
 Start the Python gateway, providers, traditional APIs, and token-only demo observer from the repository root:
