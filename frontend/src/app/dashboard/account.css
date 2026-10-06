@@ -97,14 +97,43 @@
 .account-dialog-heading h2 { font-size: 24px; line-height: 30px; letter-spacing: -.6px; }
 .account-icon-button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 6px; background: #eeece8; color: var(--muted); flex-shrink: 0; }
 .account-dialog-copy { color: var(--muted); line-height: 22px; font-size: 13px; margin-bottom: 24px; }
-.account-amount-options { padding: 0; border: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin: 0 0 24px; }
-.account-amount-options legend { margin-bottom: 12px; font-size: 12px; }
-.account-amount-options label { padding: 14px 5px; background: white; border: 1px solid var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; cursor: pointer; }
-.account-amount-options label.selected { background: #f0ecf8; border-color: #a79bbe; color: var(--violet); }
-.account-amount-options input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.account-amount-options label:has(:focus-visible) { outline: 2px solid var(--violet); outline-offset: 3px; }
-.account-checkout-summary, .account-return-amount { display: flex; align-items: center; justify-content: space-between; padding: 17px 0; border-top: 1px solid var(--line); font-size: 13px; }
-.account-checkout-summary strong { font-weight: 500; }
+.account-return-amount { display: flex; align-items: center; justify-content: space-between; padding: 17px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.account-dialog.account-top-up-dialog { width: min(480px, calc(100vw - 32px)); padding: 30px; border: 1px solid #fff; border-radius: 24px; background: #fdfdfb; box-shadow: 0 32px 100px #25203530, 0 4px 20px #2520350a; }
+.account-top-up-dialog::backdrop { background: #24202c45; backdrop-filter: blur(6px); }
+.account-top-up-dialog .account-dialog-heading { margin-bottom: 24px; }
+.account-top-up-dialog .account-dialog-heading h2 { font-size: 25px; letter-spacing: -.8px; }
+.account-top-up-dialog .account-icon-button { width: 32px; height: 32px; border-radius: 50%; background: #f1f0ed; transition: background-color 160ms ease; }
+.account-top-up-dialog .account-icon-button:hover { background: #e8e5ee; }
+.account-amount-entry { padding: 20px 20px 17px; border: 1px solid #e5e1ef; border-radius: 17px; background: linear-gradient(140deg, #f3f0fb, #f7f6fb 65%, #faf9fc); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.account-amount-entry:focus-within { border-color: #a49ac9; box-shadow: 0 0 0 3px #6259a610; }
+.account-amount-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.account-amount-label label { font-size: 12px; color: #716a84; }
+.account-amount-label > span { font-family: var(--font-mono); font-size: 10px; line-height: 20px; letter-spacing: .5px; color: #80778f; border: 1px solid #e4dfed; border-radius: 5px; padding: 0 6px; }
+.account-amount-value { display: flex; align-items: baseline; justify-content: center; gap: 5px; margin: 21px 0 15px; min-width: 0; }
+.account-amount-value > span { font-size: 36px; line-height: 1; font-weight: 400; color: #a39bb7; }
+.account-amount-value input { min-width: 0; max-width: calc(100% - 34px); padding: 0; border: 0; border-radius: 3px; background: transparent; color: #39304f; font-family: inherit; font-size: 64px; font-weight: 400; line-height: 1.12; letter-spacing: -2.5px; font-variant-numeric: tabular-nums; caret-color: var(--violet); text-align: center; }
+.account-amount-value input:focus { outline: none; }
+.account-amount-value input::selection { background: #dcd5f2; }
+.account-amount-value input::placeholder { color: #b5acc5; }
+.account-amount-value input:disabled { opacity: .6; }
+.account-amount-hint { min-height: 18px; font-size: 11px; line-height: 18px; text-align: center; color: #80778f; }
+.account-amount-entry.is-invalid { border-color: #c9907c; }
+.account-amount-entry.is-invalid .account-amount-hint { color: #9e4b33; }
+.account-top-up-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin: 12px 0 25px; padding: 0; border: 0; }
+.account-top-up-presets button { min-height: 43px; padding: 9px 5px; border: 1px solid #e6e3ea; border-radius: 10px; background: transparent; color: #736d7d; font-size: 14px; font-variant-numeric: tabular-nums; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.account-top-up-presets button:hover:not(:disabled) { background: #f2eff9; border-color: #c9c1de; color: var(--violet); }
+.account-top-up-presets button[aria-pressed="true"] { border-color: #bcb0da; background: #efebf7; color: #65538f; box-shadow: inset 0 0 0 .5px #bcb0da; }
+.account-top-up-receipt { display: flex; align-items: center; gap: 11px; padding: 20px 0; border-top: 1px solid var(--line); }
+.account-top-up-wallet { width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0; border-radius: 10px; background: #f1efea; color: #847d8b; }
+.account-top-up-receipt > div { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.account-top-up-receipt small { color: var(--muted); font-size: 11px; }
+.account-top-up-receipt strong { margin-left: auto; font-size: 19px; font-weight: 500; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.account-top-up-submit { width: 100%; min-height: 49px; margin-top: 3px; gap: 10px; border-radius: 12px; background: #37303f; font-size: 14px; box-shadow: 0 2px 3px #24193112; }
+.account-top-up-submit:hover:not(:disabled) { background: #514261; }
+.account-top-up-submit .account-spinner { border-color: #ffffff40; border-top-color: white; }
+.account-top-up-dialog .account-form-error, .account-top-up-dialog .account-inline-warning { margin: 0 0 16px; }
+.account-top-up-trust { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 17px; color: #8b858d; font-size: 10px; line-height: 16px; }
+.account-top-up-trust strong { font-weight: 500; color: #6a636f; }
 .account-helper { color: var(--muted); font-size: 11px; line-height: 18px; }
 .account-full-button { width: 100%; margin-top: 24px; font-size: 13px; gap: 8px; }
 .account-inline-warning { font-size: 12px; line-height: 19px; color: #997228; margin-top: 15px; }
@@ -238,6 +267,9 @@
   .account-page-heading h1 { font-size: 28px; }
   .account-connect-banner > .account-secondary { margin-left: 0; width: 100%; }
   .account-form-columns { grid-template-columns: 1fr; }
-  .account-amount-options { grid-template-columns: repeat(2, 1fr); }
+  .account-dialog.account-top-up-dialog { padding: 23px; border-radius: 20px; }
+  .account-amount-entry { padding: 16px 12px; }
+  .account-amount-value input { font-size: 56px; }
+  .account-top-up-presets { gap: 7px; }
   .account-setup-card { padding: 26px; }
 }

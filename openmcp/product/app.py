@@ -265,8 +265,6 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
 
     @app.post("/v1/wallet/top-ups")
     async def top_up(body: TopUpInput, principal=Depends(human), key=Depends(idempotency)):
-        if body.amount_cents not in settings.top_up_presets_cents:
-            raise ProductError("invalid_amount", "Choose one of the available top-up amounts.", 422)
         store.rate_limit("top-up:" + principal.account_id, 10)
         top = store.create_top_up(principal.account_id, key, body.amount_cents)
         return store.top_up_public(await stripe.create(top))

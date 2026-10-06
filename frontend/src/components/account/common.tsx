@@ -22,10 +22,10 @@ export function Loading({ text = "Loading your account…" }: { text?: string })
 export function Empty({ icon = "history", title, children }: { icon?: "wallet" | "history" | "agent"; title: string; children: React.ReactNode }) {
   return <div className="account-empty"><span className="account-empty-icon"><Icon name={icon} size={24}/></span><h3>{title}</h3><div>{children}</div></div>;
 }
-export function Modal({ title, children, onClose, busy = false }: { title: string; children: React.ReactNode; onClose: () => void; busy?: boolean }) {
+export function Modal({ title, children, onClose, busy = false, className = "" }: { title: string; children: React.ReactNode; onClose: () => void; busy?: boolean; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => dialog?.close(); }, []);
-  return <dialog ref={ref} className="account-dialog" aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="account-dialog-heading"><h2>{title}</h2><button aria-label="Close dialog" disabled={busy} className="account-icon-button" onClick={onClose}><Icon name="close" /></button></div>{children}</dialog>;
+  return <dialog ref={ref} className={`account-dialog ${className}`} aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}><div className="account-dialog-heading"><h2>{title}</h2><button aria-label="Close dialog" disabled={busy} className="account-icon-button" onClick={onClose}><Icon name="close" /></button></div>{children}</dialog>;
 }
 export function useResource<T>(path: string, pending?: (data: T) => boolean) {
   const [data, setData] = useState<T | null>(null);

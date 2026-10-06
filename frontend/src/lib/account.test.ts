@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AccountApiError, accountRequest, checkoutIntent, clearCheckoutIntent, parseAllowance, readCheckoutIntent, returnedCheckoutMatches, safeExternalUrl, topUpPending, type TopUp } from "./account";
+import { AccountApiError, accountRequest, checkoutIntent, clearCheckoutIntent, parseAllowance, parseTopUpAmount, readCheckoutIntent, returnedCheckoutMatches, safeExternalUrl, topUpPending, type TopUp } from "./account";
 import { accountQuery, allowedAccountPath, apiOrigin, sameOriginMutation } from "./account-proxy";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -32,6 +32,14 @@ describe("account proxy boundary", () => {
 });
 
 describe("wallet UI money and navigation safety", () => {
+  it("accepts custom top-ups as exact cents within the API's $5–$50 limits", () => {
+    for (const [value, cents] of [["5", 500], ["10.00", 1000], ["12.50", 1250], ["25.49", 2549], [" 49.99 ", 4999], ["50", 5000]] as const) {
+      expect(parseTopUpAmount(value)).toBe(cents);
+    }
+    for (const value of ["", " ", "0", "4.99", "50.01", "-10", "1e1", "12.345", "10.", "12,50", "$10", "NaN", "Infinity", "999999999999999999999"]) {
+      expect(parseTopUpAmount(value)).toBeNull();
+    }
+  });
   it("preserves exact cents and enforces the backend grant range", () => {
     expect(parseAllowance("2.40")).toBe(240); expect(parseAllowance("0.01")).toBe(1); expect(parseAllowance("10000")).toBe(1_000_000);
     for (const value of ["0", "-1", "1.001", "1e2", "Infinity", "10000.01", "", "999999999999999999999"]) expect(parseAllowance(value)).toBeNull();

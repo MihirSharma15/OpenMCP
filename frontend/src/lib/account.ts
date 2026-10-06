@@ -97,6 +97,13 @@ export function parseAllowance(value: string): number | null {
   const cents = Number(dollars) * 100 + Number(fraction.padEnd(2, "0"));
   return Number.isSafeInteger(cents) && cents > 0 && cents <= 1_000_000 ? cents : null;
 }
+// Keep these bounds aligned with TopUpInput in the account API.
+export const TOP_UP_MIN_CENTS = 500;
+export const TOP_UP_MAX_CENTS = 5000;
+export function parseTopUpAmount(value: string): number | null {
+  const cents = parseAllowance(value);
+  return cents !== null && cents >= TOP_UP_MIN_CENTS && cents <= TOP_UP_MAX_CENTS ? cents : null;
+}
 export function topUpPending(status: TopUp["status"]): boolean {
   return ["creating", "awaiting_payment", "processing"].includes(status);
 }

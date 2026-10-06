@@ -6,6 +6,8 @@ The account product connects Clerk sign-in, Stripe-funded USD credits, capped ag
 
 A user's wallet is their prepaid USD credit balance in PostgreSQL. Stripe collects the top-up payment. The platform separately funds a stablecoin treasury to pay registered MPP providers. A user does not need a crypto wallet or private key.
 
+Top-ups accept custom amounts from $5 to $50, including cents, with $5, $10, $25, and $50 suggestions. The API validates integer cents within that range. The custom-amount frontend and backend change must be released together; older API deployments accept only the preset amounts.
+
 An agent's lifetime allowance is separate from that balance. Adding money or replacing an API credential never increases the allowance. Pending purchases reserve both wallet funds and allowance. A completed purchase captures the retail charge; a terminal failure returns the reservation once. Uncertain settlement remains pending or under review until reconciled.
 
 The account runtime is isolated from the legacy fictional testnet demo. Choose `--mode account` explicitly. Account mode does not use the shared demo token, global session/reset endpoint, or local agent crypto signer.

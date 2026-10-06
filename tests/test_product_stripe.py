@@ -99,8 +99,11 @@ def setup():
     return settings, store, top, session
 
 
-async def test_checkout_uses_server_price_return_urls_and_stable_idempotency(setup):
+@pytest.mark.parametrize("amount", [1000, 1250, 2549])
+async def test_checkout_uses_server_price_return_urls_and_stable_idempotency(setup, amount):
     settings, store, top, session = setup
+    top["amount_cents"] = amount
+    session["amount_total"] = amount
     requests = []
 
     def handle(request):
@@ -112,7 +115,7 @@ async def test_checkout_uses_server_price_return_urls_and_stable_idempotency(set
         await gateway.create(top)
         request = requests[0]
         assert request.headers["idempotency-key"] == "top_one"
-        assert b"unit_amount%5D=1000" in request.content
+        assert f"unit_amount%5D={amount}".encode() in request.content
         assert b"payment_method_types" not in request.content
         assert b"top_up_id%3Dtop_one" in request.content
         assert b"canceled%3D1" in request.content

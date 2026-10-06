@@ -121,3 +121,52 @@ async def test_http_auth_errors_and_no_legacy_credit_mutations(auth_setup):
         assert (
             await client.post("/v1/me/bootstrap", headers=owner, content=b"x" * 131073)
         ).status_code == 413
+
+
+@pytest.mark.parametrize("amount", [500, 1250, 2549, 5000])
+async def test_top_up_accepts_custom_cents_without_changing_checkout_authority(auth_setup, amount):
+    settings, key, claims = auth_setup
+    store = Mock()
+    store.account_for_subject.return_value = {"account_id": "acct_one", "status": "active"}
+    top = {"id": "top_one", "amount_cents": amount, "status": "awaiting_payment"}
+    store.create_top_up.return_value = top
+    store.top_up_public.return_value = top
+    stripe = Mock(create=AsyncMock(return_value=top), close=AsyncMock())
+    app = create_app(settings, store=store, stripe=stripe)
+    headers = {
+        "Authorization": "Bearer " + jwt.encode(claims, key, algorithm="RS256"),
+        "Idempotency-Key": "custom-amount",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://api.example"
+    ) as client:
+        response = await client.post(
+            "/v1/wallet/top-ups", headers=headers, json={"amount_cents": amount}
+        )
+    assert response.status_code == 200
+    assert response.json()["amount_cents"] == amount
+    store.create_top_up.assert_called_once_with("acct_one", "custom-amount", amount)
+    store.rate_limit.assert_any_call("top-up:acct_one", 10)
+    stripe.create.assert_awaited_once_with(top)
+
+
+@pytest.mark.parametrize("amount", [0, 499, 5001, -1000, True, 1250.5, "1250"])
+async def test_invalid_top_up_amount_never_creates_a_checkout(auth_setup, amount):
+    settings, key, claims = auth_setup
+    store = Mock()
+    store.account_for_subject.return_value = {"account_id": "acct_one", "status": "active"}
+    stripe = Mock(create=AsyncMock(), close=AsyncMock())
+    app = create_app(settings, store=store, stripe=stripe)
+    headers = {
+        "Authorization": "Bearer " + jwt.encode(claims, key, algorithm="RS256"),
+        "Idempotency-Key": "invalid-amount",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://api.example"
+    ) as client:
+        response = await client.post(
+            "/v1/wallet/top-ups", headers=headers, json={"amount_cents": amount}
+        )
+    assert response.status_code == 422
+    store.create_top_up.assert_not_called()
+    stripe.create.assert_not_awaited()
