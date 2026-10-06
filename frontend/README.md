@@ -63,6 +63,12 @@ The hosted frontend is https://openmcp.vercel.app, in the `openmcp` project unde
 `mihirsharma15s-projects`. Deploy from `frontend/` with
 `vercel deploy --prod --scope mihirsharma15s-projects`.
 
+The frontend project uses Root Directory `frontend` and the Next.js preset in
+`frontend/vercel.json`. The repository-root `vercel.json` configures FastAPI for
+the separate `openmcp-api` project. In the frontend project's Vercel settings,
+disable **Include files outside the root directory in the Build Step**; the
+frontend has no build dependencies outside its directory.
+
 Clerk is connected using the existing development application. A production
 Clerk instance and custom domain remain separate launch setup. Configure the
 hosted account backend through `OPENMCP_API_URL` and `OPENMCP_PUBLIC_API_URL`,
