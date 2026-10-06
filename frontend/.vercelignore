@@ -1,0 +1,6 @@
+# Keep frontend deployments independent of the backend allowlist at repo root.
+.env*
+.next
+.vercel
+node_modules
+*.tsbuildinfo
