@@ -19,8 +19,8 @@ export function ErrorNotice({ error, retry }: { error: unknown; retry?: () => vo
   return <div className="account-notice error" role="alert"><div><strong>{expired ? "Sign in to continue" : "We could not update this information"}</strong><p>{errorMessage(error)}</p>{error instanceof AccountApiError && error.requestId && <small>Reference: {error.requestId}</small>}</div>{expired ? <Link className="account-secondary" href="/sign-in">Sign in</Link> : retry && <button className="account-secondary" onClick={retry}>Retry</button>}</div>;
 }
 export function Loading({ text = "Loading your account…" }: { text?: string }) { return <div className="account-loading" role="status"><span className="account-spinner"/>{text}</div>; }
-export function Empty({ icon = "history", title, children }: { icon?: "wallet" | "history" | "agent"; title: string; children: React.ReactNode }) {
-  return <div className="account-empty"><span className="account-empty-icon"><Icon name={icon} size={24}/></span><h3>{title}</h3><div>{children}</div></div>;
+export function Empty({ icon = "history", title, children }: { icon?: "wallet" | "history" | "agent"; title?: string; children: React.ReactNode }) {
+  return <div className="account-empty"><span className="account-empty-icon"><Icon name={icon} size={24}/></span>{title && <h3>{title}</h3>}<div>{children}</div></div>;
 }
 export function Modal({ title, children, onClose, busy = false, className = "" }: { title: string; children: React.ReactNode; onClose: () => void; busy?: boolean; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);

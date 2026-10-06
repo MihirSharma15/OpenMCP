@@ -30,7 +30,6 @@
 .account-large-money { margin: 18px 0 11px; font-size: clamp(36px, 4vw, 49px); line-height: 1.1; font-weight: 400; letter-spacing: -1.8px; font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
 .account-balance-caption { font-size: 11px; color: #716b80; position: relative; z-index: 1; }
 .account-balance-caption span { margin: 0 5px; }
-.account-balance-decoration { position: absolute; right: 5px; bottom: -64px; font-family: serif; font-size: 190px; color: #d5cde680; transform: rotate(-9deg); }
 .account-balance-secondary { padding: 25px 23px; border-left: 1px solid var(--line); }
 .account-balance-secondary strong { display: block; font-size: 30px; letter-spacing: -1px; font-weight: 400; margin: 24px 0 12px; font-variant-numeric: tabular-nums; }
 .account-balance-secondary p { color: var(--muted); font-size: 11px; line-height: 18px; max-width: 145px; }
