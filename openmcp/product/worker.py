@@ -144,6 +144,11 @@ class Worker:
         with self.store.worker_lock() as lock:
             if lock is None:
                 return False
+            if self.treasury is None and self.store.requires_treasury(self.settings.mode):
+                raise ValueError(
+                    "MPP services or unfinished MPP payments require a treasury signer; "
+                    "configure OPENMCP_TREASURY_KEY_FILE and restart the worker"
+                )
             self.store.heartbeat()
             for event in self.store.pending_events():
                 try:

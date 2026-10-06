@@ -43,7 +43,9 @@ async def run(args):
                 )
             )
             return
-        settings.validate_startup()
+        # A worker with no MPP services or unfinished MPP payments can process
+        # Stripe events without a signer. The database decides below.
+        settings.validate_startup(require_treasury_key=args.command != "worker")
         store.bind_runtime(settings)
         store.sync_catalog(settings.catalog())
         await run_with_store(args, settings, store)
@@ -79,7 +81,8 @@ async def run_with_store(args, settings, store):
     treasury = None
     worker = None
     try:
-        treasury = Treasury(settings, store)
+        if args.command != "worker" or store.requires_treasury(settings.mode):
+            treasury = Treasury(settings, store)
         worker = Worker(settings, store, stripe, treasury)
         if args.command == "worker":
             if args.once:

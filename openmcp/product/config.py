@@ -2,6 +2,7 @@
 
 import ipaddress
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Literal
@@ -14,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _SECRET_REF = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
 _LOCALHOST_NAMES = {"localhost", "localhost.localdomain"}
+log = logging.getLogger(__name__)
 
 
 def validate_service_url(url, mode):
@@ -175,7 +177,14 @@ class ProductSettings(BaseSettings):
         """Operator catalog file. None means startup must leave stored rows alone."""
         if self.catalog_path is None:
             return None
-        items = json.loads(self.catalog_path.read_text())
+        try:
+            raw = self.catalog_path.read_text()
+        except FileNotFoundError:
+            log.warning(
+                "OPENMCP_PRODUCT_CATALOG file not found; continuing with an empty service catalog"
+            )
+            return []
+        items = json.loads(raw)
         if not isinstance(items, list):
             raise ValueError("Catalog must be a JSON array")
         flat = bool(items) and all(
@@ -243,8 +252,9 @@ class ProductSettings(BaseSettings):
                 not self.treasury_key_file or not self.treasury_key_file.is_file()
             ):
                 raise ValueError("Live mode needs a private treasury key file")
-            if not self.services():
-                raise ValueError("Live mode needs an explicitly enabled live provider")
+        # Providers are optional. A missing file logs an empty catalog, while
+        # malformed or unreadable files still report their configuration errors.
+        self.catalog()
 
     def validate_database(self):
         from openmcp.database import DatabaseManager

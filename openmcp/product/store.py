@@ -932,6 +932,17 @@ class Store:
                 "SELECT count(*) AS n FROM queries WHERE enabled AND mode=%s", (mode,)
             ).fetchone()["n"]
 
+    def requires_treasury(self, mode):
+        """Keep recovery enabled even after an MPP provider leaves the catalog."""
+        with self.connection() as c:
+            return c.execute(
+                "SELECT EXISTS(SELECT 1 FROM queries WHERE enabled AND mode=%s "
+                "AND settlement='mpp') OR EXISTS(SELECT 1 FROM executions "
+                "WHERE status NOT IN ('completed','refunded','failed') "
+                "AND COALESCE(service->>'settlement','mpp')='mpp') AS required",
+                (mode,),
+            ).fetchone()["required"]
+
     def enabled_queries(self, mode):
         with self.connection() as c:
             rows = c.execute(

@@ -25,7 +25,7 @@ from psycopg.conninfo import conninfo_to_dict
 
 from openmcp.database import DatabaseManager
 from openmcp.product.app import create_app
-from openmcp.product.config import ProductSettings, Service
+from openmcp.product.config import ProductSettings, Provider, Service
 from openmcp.product.models import Principal, ProductError, now
 from openmcp.product.settlement import TerminalFailure
 from openmcp.product.store import Store
@@ -561,6 +561,97 @@ def catalog_query(endpoint_id, name, description, price_cents, *, keywords=None,
 class Closable:
     async def close(self):
         return None
+
+
+async def test_no_providers_worker_credits_stripe_and_discovery_is_empty(store):
+    settings = ProductSettings(
+        _env_file=None,
+        mode="live",
+        catalog_path=None,
+        treasury_key_file=None,
+        stripe_key="rk_live_fixture",
+        stripe_webhook_secret="whsec_fixture",
+    )
+    owner = store.bootstrap("no-providers")["account_id"]
+    top = store.create_top_up(owner, "deposit", 500)
+    session = {
+        "id": "cs_fixture",
+        "livemode": True,
+        "mode": "payment",
+        "status": "complete",
+        "currency": "usd",
+        "amount_total": 500,
+        "payment_status": "paid",
+        "client_reference_id": owner,
+        "payment_intent": "pi_fixture",
+        "metadata": {"top_up_id": top["id"], "account_id": owner},
+        "url": "https://checkout.stripe.com/c/pay/fixture",
+        "expires_at": int(time.time()) + 1000,
+    }
+    stripe = StripeGateway(
+        settings, store, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=session))
+    )
+    store.accept_event(
+        {
+            "id": "evt_no_providers",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": session["id"]}},
+            "created": int(time.time()),
+        }
+    )
+    worker = Worker(settings, store, stripe)
+    try:
+        assert await worker.tick()
+        assert store.pending_events() == []
+        assert store.wallet(Principal(owner))["balance_cents"] == 500
+        assert store.health()["worker"]
+        app = create_app(settings, store=store, verifier=Closable(), stripe=stripe)
+        principal, credential = grant(store, owner)
+        headers = {"Authorization": "Bearer " + credential["secret"]}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://api.example"
+        ) as client:
+            assert (await client.get("/health/ready")).status_code == 200
+            discovery = await client.post("/v1/discover", headers=headers, json={"query": ""})
+            assert discovery.status_code == 200
+            assert discovery.json()["providers"] == []
+            response = await client.post(
+                "/v1/execute",
+                headers=headers | {"Idempotency-Key": "missing-provider"},
+                json={"endpoint_id": "missing", "payload": {}, "max_price_cents": 40},
+            )
+            assert response.status_code == 404
+        assert store.wallet(principal)["available_cents"] == 500
+        assert store.pending_executions() == []
+    finally:
+        await stripe.close()
+
+
+async def test_no_signer_worker_preserves_mpp_recovery_after_catalog_removal(store, service):
+    assert not store.requires_treasury("test")
+    store.sync_catalog(
+        [Provider(provider_id="fixture", name="Fixture", description="Fixture", queries=[service])]
+    )
+    assert store.requires_treasury("test")
+    assert not store.requires_treasury("live")
+    store.sync_catalog([])
+    assert not store.requires_treasury("test")
+    owner = store.bootstrap("recovery")["account_id"]
+    credit(store, owner)
+    principal, _ = grant(store, owner)
+    row = store.reserve(principal, "pending", purchase(service), service)
+    store.sync_catalog([])
+    # Historical MPP snapshots predate the explicit settlement field.
+    with store.connection() as c:
+        c.execute("UPDATE executions SET service=service-'settlement'")
+    store.needs_review(row["execution_id"], "Payment outcome needs review")
+    assert store.requires_treasury("test")
+    with pytest.raises(ValueError, match="unfinished MPP payments"):
+        await Worker(ProductSettings(_env_file=None), store, Closable()).tick()
+    assert not store.health()["worker"]
+    assert store.execution_internal(row["execution_id"])["status"] == "needs_review"
+    store.finish(row["execution_id"], refund_reason="Confirmed unsigned cancellation")
+    assert not store.requires_treasury("test")
 
 
 def test_catalog_sync_replaces_rows_without_touching_purchases(store, service, tmp_path):
