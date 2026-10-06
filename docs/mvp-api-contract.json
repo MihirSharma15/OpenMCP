@@ -4,7 +4,7 @@
   "conventions": {
     "base_path": "/v1",
     "money": "integer cents, USD credits",
-    "top_ups": "Custom amounts from 500 to 5000 integer cents ($5–$50); top_up_presets_cents are suggestions, not an allowlist",
+    "top_ups": "Custom amounts from 100 to 5000 integer cents ($1–$50); top_up_presets_cents are suggestions, not an allowlist",
     "auth": "Clerk bearer for humans, opaque agent bearer for machines",
     "idempotency": "Idempotency-Key header on top-up creation and execute; same key plus different body returns 409",
     "pagination": {

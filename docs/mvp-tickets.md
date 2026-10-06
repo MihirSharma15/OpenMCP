@@ -51,7 +51,7 @@ At the start of this iteration, the repository had a Next.js frontend, a local s
 | Public home | Understand the product; sign in or open their dashboard | Signed out, signed in |
 | Sign in and sign up | Clerk authentication and return to the intended protected page | Loading, success, error |
 | Overview | Available balance, pending amount, total successful service spend, recent activity; add money or connect an agent | First use, funded, purchasing, refund, restricted account, connection failure |
-| Add money dialog | $5, $10, $25, $50 presets; chosen amount; continue to Stripe | Idle, creating checkout, redirect, recoverable error |
+| Add money dialog | Custom amounts from $1 to $50; $5, $10, $25, $50 suggestions; continue to Stripe | Idle, creating checkout, redirect, recoverable error |
 | Top-up return | Actual status of this payment and its wallet credit | Waiting for confirmation, credited, failed, expired; cancellation is displayed without asserting payment failed |
 | Transactions | Filterable chronological deposits, purchases, service refunds, and funding reversals | Empty, loading, pagination, filtered empty, error |
 | Transaction detail | Amount, state, time, service/agent, linked refund or original transaction, applicable receipt | Completed, processing, failed, under review, refunded |
@@ -133,7 +133,7 @@ User outcome: a person funds the correct wallet through Stripe Checkout and can 
 
 Action items:
 
-- Offer backend-configured presets, proposed as $5/$10/$25/$50, and show the amount of credit the user will receive.
+- Accept custom amounts from $1 to $50, offer backend-configured $5/$10/$25/$50 suggestions, and show the amount of credit the user will receive.
 - Generate one idempotency key per intended checkout and preserve it through network retries. Disable repeated submissions while a request is unresolved.
 - Redirect to the backend-supplied Stripe Checkout URL. Keep card collection within Stripe.
 - Implement `/dashboard/top-up/return` using an account-owned top-up ID and actual server status. Do not trust a success query parameter as evidence of payment.

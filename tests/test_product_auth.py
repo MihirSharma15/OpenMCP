@@ -123,7 +123,7 @@ async def test_http_auth_errors_and_no_legacy_credit_mutations(auth_setup):
         ).status_code == 413
 
 
-@pytest.mark.parametrize("amount", [500, 1250, 2549, 5000])
+@pytest.mark.parametrize("amount", [100, 101, 499, 500, 1250, 2549, 5000])
 async def test_top_up_accepts_custom_cents_without_changing_checkout_authority(auth_setup, amount):
     settings, key, claims = auth_setup
     store = Mock()
@@ -150,7 +150,7 @@ async def test_top_up_accepts_custom_cents_without_changing_checkout_authority(a
     stripe.create.assert_awaited_once_with(top)
 
 
-@pytest.mark.parametrize("amount", [0, 499, 5001, -1000, True, 1250.5, "1250"])
+@pytest.mark.parametrize("amount", [0, 1, 99, 5001, -1000, True, 100.5, "100"])
 async def test_invalid_top_up_amount_never_creates_a_checkout(auth_setup, amount):
     settings, key, claims = auth_setup
     store = Mock()

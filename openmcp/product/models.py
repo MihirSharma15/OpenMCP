@@ -43,7 +43,7 @@ class Input(BaseModel):
 
 
 class TopUpInput(Input):
-    amount_cents: StrictInt = Field(ge=500, le=5000)
+    amount_cents: StrictInt = Field(ge=100, le=5000)
 
 
 class AgentInput(Input):

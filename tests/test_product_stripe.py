@@ -99,7 +99,7 @@ def setup():
     return settings, store, top, session
 
 
-@pytest.mark.parametrize("amount", [1000, 1250, 2549])
+@pytest.mark.parametrize("amount", [100, 101, 499, 1000, 1250, 2549])
 async def test_checkout_uses_server_price_return_urls_and_stable_idempotency(setup, amount):
     settings, store, top, session = setup
     top["amount_cents"] = amount

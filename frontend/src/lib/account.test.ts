@@ -32,11 +32,11 @@ describe("account proxy boundary", () => {
 });
 
 describe("wallet UI money and navigation safety", () => {
-  it("accepts custom top-ups as exact cents within the API's $5–$50 limits", () => {
-    for (const [value, cents] of [["5", 500], ["10.00", 1000], ["12.50", 1250], ["25.49", 2549], [" 49.99 ", 4999], ["50", 5000]] as const) {
+  it("accepts custom top-ups as exact cents within the API's $1–$50 limits", () => {
+    for (const [value, cents] of [["1", 100], ["1.00", 100], ["1.01", 101], ["4.99", 499], ["5", 500], ["10.00", 1000], ["12.50", 1250], ["25.49", 2549], [" 49.99 ", 4999], ["50", 5000]] as const) {
       expect(parseTopUpAmount(value)).toBe(cents);
     }
-    for (const value of ["", " ", "0", "4.99", "50.01", "-10", "1e1", "12.345", "10.", "12,50", "$10", "NaN", "Infinity", "999999999999999999999"]) {
+    for (const value of ["", " ", "0", "0.01", "0.99", "50.01", "-10", "1e1", "1.001", "12.345", "10.", "12,50", "$10", "NaN", "Infinity", "999999999999999999999"]) {
       expect(parseTopUpAmount(value)).toBeNull();
     }
   });

@@ -38,7 +38,7 @@ export function AddMoneyDialog({ presets, mode, busy = false, error, onClose, on
             onFocus={event => event.currentTarget.select()} />
         </div>
         <p id={`${inputId}-hint`} className="account-amount-hint" aria-live="polite">
-          {invalid ? `Enter ${money(TOP_UP_MIN_CENTS)}–${money(TOP_UP_MAX_CENTS)}, with up to 2 decimal places.` : "Your amount. Your call. $5–$50 per top-up."}
+          {invalid ? `Enter ${money(TOP_UP_MIN_CENTS)}–${money(TOP_UP_MAX_CENTS)}, with up to 2 decimal places.` : `Your amount. Your call. $${TOP_UP_MIN_CENTS / 100}–$${TOP_UP_MAX_CENTS / 100} per top-up.`}
         </p>
       </div>
       <fieldset className="account-top-up-presets" disabled={busy}>
