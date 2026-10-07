@@ -66,7 +66,7 @@ class Store:
                 (address.lower(),),
             )
 
-    def sync_catalog(self, providers):
+    def sync_catalog(self, providers, *, prune=True):
         if providers is None:
             return
         with self.connection() as c:
@@ -88,6 +88,13 @@ class Store:
                 )
             for provider in providers:
                 for query in provider.queries:
+                    if not prune:
+                        owner = c.execute(
+                            "SELECT provider_id FROM queries WHERE endpoint_id=%s",
+                            (query.endpoint_id,),
+                        ).fetchone()
+                        if owner and owner["provider_id"] != provider.provider_id:
+                            raise ValueError("Another provider owns this endpoint ID")
                     endpoint_ids.append(query.endpoint_id)
                     c.execute(
                         "INSERT INTO queries(endpoint_id,provider_id,name,description,price_cents,"
@@ -120,8 +127,9 @@ class Store:
                             query.adapter,
                         ),
                     )
-            self._delete_missing(c, "queries", "endpoint_id", endpoint_ids)
-            self._delete_missing(c, "providers", "provider_id", provider_ids)
+            if prune:
+                self._delete_missing(c, "queries", "endpoint_id", endpoint_ids)
+                self._delete_missing(c, "providers", "provider_id", provider_ids)
 
     @staticmethod
     def _delete_missing(connection, table, column, keep):

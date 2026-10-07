@@ -39,6 +39,9 @@ packages = ["openmcp", "openmcp_provider", "openmcp_creator"]
 "supabase/migrations/20261005191933_account_product.sql" = "openmcp/product/migrations/20261005191933_account_product.sql"
 "supabase/migrations/20261005192312_account_indexes.sql" = "openmcp/product/migrations/20261005192312_account_indexes.sql"
 "supabase/migrations/20261006000000_dataforseo.sql" = "openmcp/product/migrations/20261006000000_dataforseo.sql"
+"supabase/migrations/20261007000000_tavily.sql" = "openmcp/product/migrations/20261007000000_tavily.sql"
+"supabase/migrations/20261007010000_firecrawl.sql" = "openmcp/product/migrations/20261007010000_firecrawl.sql"
+"supabase/migrations/20261007020000_exa.sql" = "openmcp/product/migrations/20261007020000_exa.sql"
 
 [dependency-groups]
 dev = ["pytest>=8,<9", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1"]

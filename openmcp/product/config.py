@@ -73,7 +73,7 @@ class Service(BaseModel):
     url: str
     recipient: str = ""
     settlement: Literal["mpp", "api_key"] = "mpp"
-    adapter: Literal["http", "dataforseo"] = "http"
+    adapter: Literal["http", "dataforseo", "tavily", "firecrawl", "exa"] = "http"
     price_cents: int = Field(ge=2, le=1_000_000)
     input_schema: dict
     output_schema: dict = Field(default_factory=lambda: {"type": "object"})
@@ -94,6 +94,24 @@ class Service(BaseModel):
 
             if self.settlement != "api_key":
                 raise ValueError("DataForSEO uses prepaid API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "tavily":
+            from openmcp.integrations.tavily.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Tavily uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "firecrawl":
+            from openmcp.integrations.firecrawl.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Firecrawl uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "exa":
+            from openmcp.integrations.exa.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Exa uses API credentials, not MPP settlement")
             validate_target(self.endpoint_id, self.url, self.mode)
         if self.settlement == "mpp":
             if not is_address(self.recipient):
@@ -116,9 +134,9 @@ class Service(BaseModel):
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
         }
-        if self.adapter == "dataforseo":
+        if self.adapter in {"dataforseo", "tavily", "firecrawl", "exa"}:
             # The wholesale charge varies with results and can be fractional cents.
-            # Do not advertise the legacy MPP split as a DataForSEO price quote.
+            # Do not advertise the legacy MPP split as an API-key vendor price quote.
             result.pop("provider_price_cents")
             result.pop("platform_fee_cents")
         return result

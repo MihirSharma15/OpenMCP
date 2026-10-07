@@ -45,6 +45,52 @@ class ApiKeyCaller:
             raise TerminalFailure("Provider API key is not configured.")
         headers = self._headers(row, key)
         payload = row["payload"]
+        tavily_rate = None
+        firecrawl_rate = None
+        if service.adapter == "exa":
+            from openmcp.integrations.exa.protocol import prepare
+
+            try:
+                payload, headers["x-api-key"] = prepare(
+                    service.endpoint_id, service.url, service.mode, payload, key
+                )
+                headers.pop("Authorization")
+            except ValueError as exc:
+                raise TerminalFailure(str(exc)) from exc
+        if service.adapter == "firecrawl":
+            from openmcp.integrations.firecrawl.protocol import (
+                DEFAULT_CREDIT_COST_MICROUSD,
+                credit_rate,
+                prepare,
+            )
+
+            try:
+                firecrawl_rate = credit_rate(
+                    os.environ.get(
+                        "FIRECRAWL_CREDIT_COST_MICROUSD", str(DEFAULT_CREDIT_COST_MICROUSD)
+                    )
+                )
+                payload, headers["Authorization"] = prepare(
+                    service.endpoint_id, service.url, service.mode, payload, key
+                )
+            except ValueError as exc:
+                raise TerminalFailure(str(exc)) from exc
+        if service.adapter == "tavily":
+            from openmcp.integrations.tavily.protocol import (
+                DEFAULT_CREDIT_COST_MICROUSD,
+                credit_rate,
+                prepare,
+            )
+
+            try:
+                tavily_rate = credit_rate(
+                    os.environ.get("TAVILY_CREDIT_COST_MICROUSD", str(DEFAULT_CREDIT_COST_MICROUSD))
+                )
+                payload, headers["Authorization"] = prepare(
+                    service.endpoint_id, service.url, service.mode, payload, key
+                )
+            except ValueError as exc:
+                raise TerminalFailure(str(exc)) from exc
         if service.adapter == "dataforseo":
             from openmcp.integrations.dataforseo.protocol import prepare
 
@@ -73,6 +119,32 @@ class ApiKeyCaller:
             raise TerminalFailure("Provider request failed after it was sent.") from exc
         receipt = {"method": "api_key", "status": "success"}
         cost = None
+        if service.adapter == "exa":
+            from openmcp.integrations.exa.protocol import parse
+
+            try:
+                data, receipt, cost = parse(service.endpoint_id, row["payload"], data)
+            except (ValueError, TypeError, KeyError) as exc:
+                raise TerminalFailure("Exa result or cost estimate needs review.") from exc
+        if service.adapter == "firecrawl":
+            from openmcp.integrations.firecrawl.protocol import parse
+
+            try:
+                data, receipt, cost = parse(
+                    service.endpoint_id, row["payload"], data, firecrawl_rate
+                )
+            except (ValueError, TypeError, KeyError) as exc:
+                raise TerminalFailure("Firecrawl result or credit usage needs review.") from exc
+        if service.adapter == "tavily":
+            from openmcp.integrations.tavily.protocol import Rejected, parse
+
+            try:
+                data, receipt, cost = parse(row["payload"], data, tavily_rate, service.endpoint_id)
+            except Rejected as exc:
+                self.store.finish(row["execution_id"], refund_reason=str(exc))
+                return
+            except (ValueError, TypeError, KeyError) as exc:
+                raise TerminalFailure("Tavily result or credit usage needs review.") from exc
         if service.adapter == "dataforseo":
             from openmcp.integrations.dataforseo.protocol import Rejected, parse
 
@@ -107,9 +179,12 @@ class ApiKeyCaller:
                 content.extend(chunk)
                 if len(content) > _MAX_RESPONSE_BYTES:
                     raise TerminalFailure("Provider response exceeded the maximum size.")
-            return httpx.Response(
-                response.status_code, headers=response.headers, content=bytes(content)
-            )
+            # aiter_bytes() already decoded compression. Reusing Content-Encoding
+            # would make the new response decompress these plain bytes again.
+            headers = response.headers.copy()
+            headers.pop("content-encoding", None)
+            headers.pop("content-length", None)
+            return httpx.Response(response.status_code, headers=headers, content=bytes(content))
 
     @staticmethod
     def _object(response, *, require_success=True):

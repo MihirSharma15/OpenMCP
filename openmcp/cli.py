@@ -163,6 +163,21 @@ async def check_mcp(mode="demo"):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "exa":
+        from .integrations.exa.cli import main as exa_main
+
+        exa_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "firecrawl":
+        from .integrations.firecrawl.cli import main as firecrawl_main
+
+        firecrawl_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "tavily":
+        from .integrations.tavily.cli import main as tavily_main
+
+        tavily_main(sys.argv[2:])
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "dataforseo":
         from .integrations.dataforseo.cli import main as dataforseo_main
 
@@ -181,6 +196,9 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("creator", help="URL-to-paid-service worker; see creator --help")
     commands.add_parser("dataforseo", help="DataForSEO catalog, sandbox checks, and upstream MCP")
+    commands.add_parser("tavily", help="Tavily catalog and one-credit live verification")
+    commands.add_parser("exa", help="Exa service catalog and database registration")
+    commands.add_parser("firecrawl", help="Firecrawl service catalog and database registration")
     register_commands(commands)
     connect = commands.add_parser("connect", help="Save an account agent credential privately")
     connect.add_argument("--base-url", required=True, help="HTTPS account API origin")
