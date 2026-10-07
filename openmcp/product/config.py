@@ -73,6 +73,7 @@ class Service(BaseModel):
     url: str
     recipient: str = ""
     settlement: Literal["mpp", "api_key"] = "mpp"
+    adapter: Literal["http", "dataforseo"] = "http"
     price_cents: int = Field(ge=2, le=1_000_000)
     input_schema: dict
     output_schema: dict = Field(default_factory=lambda: {"type": "object"})
@@ -88,6 +89,12 @@ class Service(BaseModel):
     @model_validator(mode="after")
     def validate_service(self):
         validate_service_url(self.url, self.mode)
+        if self.adapter == "dataforseo":
+            from openmcp.integrations.dataforseo.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("DataForSEO uses prepaid API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
         if self.settlement == "mpp":
             if not is_address(self.recipient):
                 raise ValueError("Invalid provider recipient")
@@ -98,7 +105,7 @@ class Service(BaseModel):
         return self
 
     def public(self):
-        return {
+        result = {
             "endpoint_id": self.endpoint_id,
             "name": self.name,
             "description": self.description,
@@ -109,6 +116,12 @@ class Service(BaseModel):
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
         }
+        if self.adapter == "dataforseo":
+            # The wholesale charge varies with results and can be fractional cents.
+            # Do not advertise the legacy MPP split as a DataForSEO price quote.
+            result.pop("provider_price_cents")
+            result.pop("platform_fee_cents")
+        return result
 
 
 class Provider(BaseModel):

@@ -126,6 +126,14 @@ Each provider has `provider_id`, `name`, `description`, and `queries`. There is 
 
 `settlement` defaults to `mpp`. An MPP query needs the provider's Tempo recipient. An `api_key` query does not: its provider sets `secret_ref` to an environment variable name, and that variable holds the bearer token. The catalog file never contains the token. The name is stored on the provider row only and is not copied onto purchases or discovery responses. The worker reads the variable when it POSTs. Private, link-local, and non-test localhost URLs are rejected. Hostnames are not resolved; DNS rebinding is out of scope. Test mode may use a loopback URL for a local adapter.
 
+`adapter` defaults to `http`, which sends the payload as a JSON object with Bearer
+authentication. The `dataforseo` adapter sends one Basic-authenticated task, validates
+DataForSEO's task status and reported cost, and returns normalized search/keyword data.
+See [DataForSEO onboarding](dataforseo.md) for its three approved services, limits,
+prices, sandbox checks, and the official upstream MCP server. API-key workers started
+through the operator CLI load provider credentials from the private root `.env` as
+well as exported environment variables; exported values take precedence.
+
 Replace every placeholder and confirm the provider's replay behavior before enabling it. At a 40-cent retail price, an MPP challenge must request 36 cents. It must bind the body digest and execution memo, accept the forwarded execution/idempotency ID, and replay the same paid credential's receipt and result. The existing provider package demonstrates that protocol; its fictional demo services do not constitute a live provider. An API-key query charges the same retail price and does not add a second vendor fee. Restart the API and worker after catalog changes. Startup copies the file into the account database and drops catalog rows that are no longer listed. Purchases keep the terms saved on the execution. The worker checks current catalog terms before signing an MPP payment and retains immutable terms for already signed payments.
 
 Test configuration defaults to Tempo testnet. Live mode requires explicit production settings and the supported mainnet USDC address; providers can be added later. MPP settlement additionally requires an enabled HTTPS live provider and a private treasury key; see the root `.env.example` and [Tempo's SDK network/token definitions](https://github.com/tempoxyz/pympp/blob/main/src/mpp/methods/tempo/_defaults.py). Configure the signer as either a raw private hex key or JSON containing `private_key`, in an owner-only regular file (`chmod 600`). Never pass the key through the browser, account API, MCP client, or command arguments.

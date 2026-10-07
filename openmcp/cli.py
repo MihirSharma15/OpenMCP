@@ -129,10 +129,13 @@ async def check_mcp(mode="demo"):
             await session.initialize()
             listed = await session.list_tools()
             balance = await session.call_tool("balance", {})
-            discovery = await session.call_tool("discover", {
-                "query": "services" if mode == "account" else "FreightFlow due diligence",
-                "budget_cents": 0 if mode == "account" else 1500,
-            })
+            discovery = await session.call_tool(
+                "discover",
+                {
+                    "query": "services" if mode == "account" else "FreightFlow due diligence",
+                    "budget_cents": 0 if mode == "account" else 1500,
+                },
+            )
             failure = balance.isError or discovery.isError
             if not failure:
                 summary = {
@@ -160,6 +163,11 @@ async def check_mcp(mode="demo"):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "dataforseo":
+        from .integrations.dataforseo.cli import main as dataforseo_main
+
+        dataforseo_main(sys.argv[2:])
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "creator":
         from openmcp_creator.cli import main as creator_main
 
@@ -172,6 +180,7 @@ def main():
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("creator", help="URL-to-paid-service worker; see creator --help")
+    commands.add_parser("dataforseo", help="DataForSEO catalog, sandbox checks, and upstream MCP")
     register_commands(commands)
     connect = commands.add_parser("connect", help="Save an account agent credential privately")
     connect.add_argument("--base-url", required=True, help="HTTPS account API origin")

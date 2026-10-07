@@ -92,8 +92,8 @@ class Store:
                     c.execute(
                         "INSERT INTO queries(endpoint_id,provider_id,name,description,price_cents,"
                         "input_schema,output_schema,url,recipient,enabled,mode,keywords,"
-                        "supports_idempotency,settlement) "
-                        "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                        "supports_idempotency,settlement,adapter) "
+                        "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
                         "ON CONFLICT(endpoint_id) DO UPDATE SET "
                         "provider_id=EXCLUDED.provider_id, name=EXCLUDED.name, "
                         "description=EXCLUDED.description, price_cents=EXCLUDED.price_cents, "
@@ -101,7 +101,7 @@ class Store:
                         "url=EXCLUDED.url, recipient=EXCLUDED.recipient, enabled=EXCLUDED.enabled, "
                         "mode=EXCLUDED.mode, keywords=EXCLUDED.keywords, "
                         "supports_idempotency=EXCLUDED.supports_idempotency, "
-                        "settlement=EXCLUDED.settlement",
+                        "settlement=EXCLUDED.settlement, adapter=EXCLUDED.adapter",
                         (
                             query.endpoint_id,
                             provider.provider_id,
@@ -117,6 +117,7 @@ class Store:
                             Jsonb(query.keywords),
                             query.supports_idempotency,
                             query.settlement,
+                            query.adapter,
                         ),
                     )
             self._delete_missing(c, "queries", "endpoint_id", endpoint_ids)
@@ -702,11 +703,25 @@ class Store:
                     "payment_journal_conflict", "Payment was already journaled.", 409
                 )
 
-    def mark_paid(self, execution_id, receipt):
+    def mark_paid(self, execution_id, receipt, *, data=None, cost_microusd=None):
+        if cost_microusd is not None and (type(cost_microusd) is not int or cost_microusd < 0):
+            raise ValueError("Provider cost must be nonnegative integer micro-USD")
         with self.connection() as c:
             c.execute(
-                "UPDATE executions SET payment_status='confirmed',provider_receipt=%s,provider_cost_cents=provider_price_cents,status='fulfillment_pending',updated_at=now() WHERE execution_id=%s AND status IN ('reserved','payment_pending','fulfillment_pending','needs_review')",
-                (Jsonb(receipt), execution_id),
+                "UPDATE executions SET payment_status='confirmed',provider_receipt=%s,"
+                "provider_cost_microusd=COALESCE(%s,provider_price_cents*10000),"
+                "provider_cost_cents=CASE WHEN %s::bigint IS NULL THEN provider_price_cents "
+                "ELSE ceil(%s::numeric/10000)::bigint END,"
+                "data=COALESCE(%s,data),status='fulfillment_pending',updated_at=now() "
+                "WHERE execution_id=%s AND status IN ('reserved','payment_pending','fulfillment_pending','needs_review')",
+                (
+                    Jsonb(receipt),
+                    cost_microusd,
+                    cost_microusd,
+                    cost_microusd,
+                    None if data is None else Jsonb(data),
+                    execution_id,
+                ),
             )
 
     def finish(self, execution_id, *, data=None, refund_reason=None, payment_reverted=False):
@@ -948,7 +963,7 @@ class Store:
             rows = c.execute(
                 "SELECT q.endpoint_id, q.name, q.description, q.price_cents, q.input_schema, "
                 "q.output_schema, q.url, q.recipient, q.enabled, q.mode, q.keywords, "
-                "q.supports_idempotency, q.settlement, q.provider_id, p.name AS provider_name, "
+                "q.supports_idempotency, q.settlement, q.adapter, q.provider_id, p.name AS provider_name, "
                 "p.description AS provider_description "
                 "FROM queries q JOIN providers p ON p.provider_id=q.provider_id "
                 "WHERE q.enabled AND q.mode=%s",
@@ -994,6 +1009,7 @@ class Store:
                 "mode": row["mode"],
                 "supports_idempotency": row["supports_idempotency"],
                 "settlement": row["settlement"],
+                "adapter": row["adapter"],
             }
         )
 

@@ -6,6 +6,10 @@ and the [implementation tickets](docs/mvp-tickets.md). It runs in explicit accou
 the testnet demo below remains a separate flow. Live use requires production configuration,
 a funded platform treasury, and an enabled live provider.
 
+[DataForSEO setup](docs/dataforseo.md) adds Google search, keyword metrics, and related
+keyword ideas to account-mode discovery and purchases. It uses prepaid API credentials;
+these services do not require a crypto treasury. The checked-in catalog uses the free sandbox.
+
 Get paid for data you already own. This POC demonstrates **MPP on both payment hops**, using real transactions on **Tempo Moderato testnet**. No Stripe account, card, Connect account, or real money is involved.
 
 ```text

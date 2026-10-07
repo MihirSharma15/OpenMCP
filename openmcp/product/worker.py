@@ -37,6 +37,9 @@ class Worker:
     async def _execute_api_key(self, row):
         if row.get("status") in {"completed", "refunded"}:
             return
+        if row.get("payment_status") == "confirmed" and isinstance(row.get("data"), dict):
+            self.store.finish(row["execution_id"], data=row["data"])
+            return
         # Already sent or confirmed: hold for review and do not POST again.
         if row.get("payment_status") in {"sent", "confirmed"}:
             self.store.needs_review(

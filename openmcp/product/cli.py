@@ -6,6 +6,8 @@ import json
 import logging
 import os
 
+from dotenv import load_dotenv
+
 from openmcp.database import DatabaseManager
 
 from .config import ProductSettings, Service
@@ -160,6 +162,8 @@ def main():
     )
     reconcile.add_argument("--reason")
     args = parser.parse_args()
+    # Provider credential references are resolved from the worker environment.
+    load_dotenv(".env")
     logging.basicConfig(level=logging.INFO)
     try:
         asyncio.run(run(args))

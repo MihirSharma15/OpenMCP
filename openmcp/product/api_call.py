@@ -1,6 +1,6 @@
 """One POST for every API-key query.
 
-The bearer token is read from the environment at call time. It is not logged,
+The provider credential is read from the environment at call time. It is not logged,
 not placed on the execution, and not taken from the catalog JSON. secret_ref
 is only the variable name, looked up from the provider row.
 """
@@ -43,6 +43,18 @@ class ApiKeyCaller:
         key = os.environ.get(secret_ref, "") if secret_ref else ""
         if not key:
             raise TerminalFailure("Provider API key is not configured.")
+        headers = self._headers(row, key)
+        payload = row["payload"]
+        if service.adapter == "dataforseo":
+            from openmcp.integrations.dataforseo.protocol import prepare
+
+            try:
+                payload, headers["Authorization"] = prepare(
+                    service.endpoint_id, service.url, service.mode, payload, key
+                )
+            except ValueError as exc:
+                raise TerminalFailure(str(exc)) from exc
+        body = canonical(payload)
         try:
             self.store.mark_sent(row["execution_id"])
         except ProductError as exc:
@@ -53,16 +65,30 @@ class ApiKeyCaller:
         try:
             # Same URL rule, immediately before the POST. A rejection here does not send.
             validate_service_url(service.url, service.mode)
-            response = await self._post(
-                service, canonical(row["payload"]), self._headers(row, key)
-            )
-            data = self._object(response)
+            response = await self._post(service, body, headers)
+            data = self._object(response, require_success=service.adapter != "dataforseo")
         except TerminalFailure:
             raise
         except Exception as exc:
             raise TerminalFailure("Provider request failed after it was sent.") from exc
         receipt = {"method": "api_key", "status": "success"}
-        self.store.mark_paid(row["execution_id"], receipt)
+        cost = None
+        if service.adapter == "dataforseo":
+            from openmcp.integrations.dataforseo.protocol import Rejected, parse
+
+            try:
+                data, receipt, cost = parse(service.endpoint_id, service.mode, row["payload"], data)
+            except Rejected as exc:
+                # An explicit vendor rejection with zero reported cost is conclusive.
+                self.store.finish(row["execution_id"], refund_reason=str(exc))
+                return
+            except (ValueError, TypeError, KeyError) as exc:
+                raise TerminalFailure("DataForSEO task or result needs review.") from exc
+            if not response.is_success:
+                raise TerminalFailure("DataForSEO returned an inconsistent HTTP status.")
+        # Save the result together with the receipt. A crash before finish can then
+        # recover without submitting another paid API task.
+        self.store.mark_paid(row["execution_id"], receipt, data=data, cost_microusd=cost)
         self.store.finish(row["execution_id"], data=data)
 
     @staticmethod
@@ -86,8 +112,8 @@ class ApiKeyCaller:
             )
 
     @staticmethod
-    def _object(response):
-        if not response.is_success:
+    def _object(response, *, require_success=True):
+        if require_success and not response.is_success:
             raise TerminalFailure("Provider request failed after it was sent.")
         try:
             data = response.json()

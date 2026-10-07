@@ -150,6 +150,12 @@ class DatabaseManager:
                 row = connection.execute(
                     "SELECT version FROM schema_version WHERE singleton=1"
                 ).fetchone()
+                # Additive provider columns preserve the v1 contract for older
+                # deployments, while this release requires the new migration.
+                connection.execute(
+                    "SELECT q.adapter, e.provider_cost_microusd "
+                    "FROM queries q, executions e LIMIT 0"
+                )
                 if self.provider == "supabase":
                     privileges = connection.execute(
                         "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls "
@@ -163,8 +169,14 @@ class DatabaseManager:
                         )
             if not row or row["version"] != 1:
                 raise RuntimeError("Account schema is incompatible; run account migrate")
-        except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName):
-            raise RuntimeError("Account schema is missing; run account migrate") from None
+        except (
+            psycopg.errors.UndefinedTable,
+            psycopg.errors.UndefinedColumn,
+            psycopg.errors.InvalidSchemaName,
+        ):
+            raise RuntimeError(
+                "Account schema is missing or incomplete; run account migrate"
+            ) from None
 
     def close(self):
         self._pool.close()
