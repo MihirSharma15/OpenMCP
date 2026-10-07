@@ -139,7 +139,14 @@ async def check_mcp(mode="demo"):
                     "stdio": "ok",
                     "tools": [t.name for t in listed.tools],
                     "mode": mode,
-                    "discovered_endpoints": len(discovery.structuredContent["endpoints"]),
+                    "discovered_endpoints": (
+                        sum(
+                            len(provider["queries"])
+                            for provider in discovery.structuredContent["providers"]
+                        )
+                        if mode == "account"
+                        else len(discovery.structuredContent["endpoints"])
+                    ),
                     "spent_by_check_cents": 0,
                 }
                 if mode == "account":
