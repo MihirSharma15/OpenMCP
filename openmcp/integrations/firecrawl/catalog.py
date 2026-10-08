@@ -52,7 +52,7 @@ SERVICES = {
         "price_cents": 2,
         "input_schema": SCRAPE_SCHEMA,
         "name": "Scrape webpage as Markdown",
-        "description": "Retrieve a public HTTPS webpage as Markdown with title, description, and source metadata. One page only, no PDF parsing, authenticated pages, browser actions, or AI extraction. Flat $0.02 per successful request.",
+        "description": "Read one public HTTPS webpage url as Markdown, with available title, description and source metadata. only_main_content defaults to true; set false to include surrounding page content. Does not follow linked pages, parse PDFs, access authenticated pages, perform browser actions or run AI extraction. Flat $0.02 per successful request.",
     },
     HTML: {
         "path": "/scrape",
@@ -60,21 +60,21 @@ SERVICES = {
         "price_cents": 2,
         "input_schema": SCRAPE_SCHEMA,
         "name": "Scrape webpage as HTML",
-        "description": "Retrieve cleaned HTML from a public HTTPS webpage for structured parsing, with source metadata. One page only; no PDF parsing, screenshots, actions, or AI extraction. Flat $0.02 per successful request.",
+        "description": "Retrieve cleaned HTML from one public HTTPS webpage url for structured parsing, with available source metadata. only_main_content defaults to true; set false to include surrounding page content. Does not follow links, parse PDFs, access authenticated pages, capture screenshots or perform browser actions/AI extraction. Flat $0.02 per successful request.",
     },
     SEARCH: {
         "path": "/search",
         "price_cents": 2,
         "input_schema": SEARCH_SCHEMA,
         "name": "Search web or news",
-        "description": "Search up to ten web or news results with titles, URLs, and descriptions. Optional recency and country filters. Does not scrape result pages. Flat $0.02 per successful request; no images or paid enrichment.",
+        "description": "Find web or news sources for query (1–500 characters). Returns titles, URLs and available descriptions without scraping result pages. limit is 1–10, default 10; source is web (default) or news. Optional time_range day/week/month/year and uppercase two-letter country (default US). No image search or paid enrichment. Flat $0.02 per successful request.",
     },
     MAP: {
         "path": "/map",
         "price_cents": 2,
         "input_schema": MAP_SCHEMA,
         "name": "Map website URLs",
-        "description": "Find up to ten URLs on a public HTTPS website, optionally matching a search phrase, without fetching page content. One vendor credit per call regardless of returned links. Flat $0.02 per successful request.",
+        "description": "Find links on a public HTTPS website url without fetching page contents. limit is 1–10, default 10; optional search (1–500 characters) filters links by phrase. Returns results as link objects containing URLs and available title/description metadata. Excludes subdomains and ignores URL query parameters. Use a scrape query separately to read selected pages. One vendor credit per call regardless of returned links; flat $0.02 per successful request.",
     },
 }
 
@@ -85,7 +85,7 @@ def provider(mode="test"):
     return {
         "provider_id": "firecrawl",
         "name": "Firecrawl",
-        "description": "Webpage Markdown/HTML scraping and web/news search for agent research.",
+        "description": "Four OpenMCP queries: scrape one public HTTPS page as Markdown or cleaned HTML, search web/news without scraping results, and map website URLs. Does not expose recursive crawl jobs, authenticated browser sessions, screenshots, browser actions or AI extraction.",
         "secret_ref": "FIRECRAWL_API_KEY",
         "queries": [
             {

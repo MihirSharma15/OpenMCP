@@ -2,13 +2,13 @@
   {
     "provider_id": "tavily",
     "name": "Tavily",
-    "description": "Web search, news and financial research, webpage extraction, and website URL mapping.",
+    "description": "Basic and advanced web search with general/news/finance topic filters, Markdown extraction from batches of up to five public HTTPS pages, and one-level website URL mapping. Finance means web search about finance, not a financial database. OpenMCP does not expose Tavily answer generation or recursive crawling.",
     "secret_ref": "TAVILY_API_KEY",
     "queries": [
       {
         "endpoint_id": "tavily-web-search",
         "name": "Tavily Basic web search",
-        "description": "Search up to 20 web pages with titles, source URLs, and excerpts. Supports news/finance, recency, and domain filters. Uses one Tavily credit.",
+        "description": "Find web sources for query (1\u2013400 characters) using basic search. Returns titles, URLs and content excerpts, not full pages or a generated answer. max_results is 1\u201320, default 10. Optional topic general/news/finance (default general), time_range day/week/month/year, and include_domains/exclude_domains (up to ten each). Uses one Tavily search credit.",
         "keywords": [
           "web",
           "search",
@@ -107,7 +107,7 @@
       {
         "endpoint_id": "tavily-advanced-search",
         "name": "Tavily Advanced web search",
-        "description": "Search up to 20 web pages with more relevant content chunks. Supports news/finance, recency, and domain filters. Uses two Tavily credits.",
+        "description": "Find web sources for query (1\u2013400 characters) using advanced search depth and content chunks. Returns titles, URLs and excerpts, not full pages or a generated answer. max_results is 1\u201320, default 10. Optional topic general/news/finance (default general), time_range day/week/month/year, and include_domains/exclude_domains (up to ten each). Uses two Tavily search credits.",
         "keywords": [
           "web",
           "search",
@@ -206,7 +206,7 @@
       {
         "endpoint_id": "tavily-extract",
         "name": "Tavily Extract webpage content",
-        "description": "Extract Markdown from one to five public HTTPS URLs. Optional query selects relevant chunks. Partial successes include failed URLs; the flat batch price applies if any URL succeeds.",
+        "description": "Read one to five unique public HTTPS urls using basic extraction. Returns Markdown content per successful URL and failed_results for failures. Optional query (1\u2013400 characters) selects relevant content chunks instead of unfocused page content. A partial batch is returned with partial_success; the flat batch price applies if any URL succeeds. Does not crawl linked pages.",
         "keywords": [
           "web",
           "website",
@@ -274,7 +274,7 @@
       {
         "endpoint_id": "tavily-advanced-extract",
         "name": "Tavily Advanced webpage extraction",
-        "description": "Extract Markdown including tables and embedded content from one to five public HTTPS URLs. Higher extraction success; partial batches are billed at the flat batch price.",
+        "description": "Read one to five unique public HTTPS urls using advanced extraction depth. Returns Markdown content per successful URL and failed_results for failures. Optional query (1\u2013400 characters) selects relevant chunks. Choose this when advanced extraction is needed; success is not guaranteed. A partial batch is returned with partial_success; the flat batch price applies if any URL succeeds. Does not crawl linked pages.",
         "keywords": [
           "web",
           "website",
@@ -342,7 +342,7 @@
       {
         "endpoint_id": "tavily-map",
         "name": "Tavily Map website URLs",
-        "description": "Discover up to 50 URLs on a public HTTPS website, one link level deep. Returns links, not page content. No external links or paid natural-language instructions. Flat price per map.",
+        "description": "Discover links from a public HTTPS website url, one link level deep. limit is 1\u201350, default 20. Returns results as URL strings, not page contents. External links are excluded. Use extraction separately to read selected pages. No recursive crawling or natural-language mapping instructions. Flat price per map request.",
         "keywords": [
           "web",
           "website",

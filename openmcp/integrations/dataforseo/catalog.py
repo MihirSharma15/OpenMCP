@@ -45,9 +45,7 @@ SERVICES = {
     SEARCH: {
         "name": "DataForSEO Google search results",
         "description": (
-            "Search Google for current organic search results, rankings, titles, URLs, and "
-            "snippets for a keyword and location. Fetches the first results page (depth 10). "
-            "Use plain text: search operators and paid enrichment options are not supported."
+            "Find the first page of Google organic results for keyword (1–700 characters). Returns up to ten titles, URLs, snippets and rankings, plus available SERP feature types. location_code defaults to 2840 (United States), language_code to en, and device to desktop (mobile supported). Use plain text without colons or percent escapes. Does not retrieve page contents or paid enrichment."
         ),
         "path": "/v3/serp/google/organic/live/advanced",
         "price_cents": 2,
@@ -68,10 +66,7 @@ SERVICES = {
     OVERVIEW: {
         "name": "DataForSEO Google keyword metrics",
         "description": (
-            "Research up to 100 Google keywords: search volume, monthly trends, cost per click "
-            "(CPC), paid-search competition, organic ranking difficulty, and search intent. "
-            "Metrics come from DataForSEO's keyword database, updated monthly; unknown keywords "
-            "may be missing. Includes source update timestamps."
+            "Compare Google SEO metrics for keywords: 1–100 unique phrases, each at most 80 characters and ten words. Returns available search volume, monthly search trends, CPC, paid-search competition, organic difficulty, intent and update timestamps. location_code defaults to 2840 (United States) and language_code to en. Uses the monthly keyword database; unknown keywords or individual metrics may be missing."
         ),
         "path": "/v3/dataforseo_labs/google/keyword_overview/live",
         "price_cents": 5,
@@ -92,10 +87,7 @@ SERVICES = {
     RELATED: {
         "name": "DataForSEO related Google keyword ideas",
         "description": (
-            "Find up to 100 related keyword ideas from Google's related-search data for a seed "
-            "keyword. Returns available search volume, CPC, competition, difficulty, intent, "
-            "and monthly trends. Uses DataForSEO's SERP and keyword databases; fewer ideas "
-            "may be available. Includes source update timestamps."
+            "Generate related Google keyword ideas from a seed keyword (at most 80 characters and ten words). limit is 1–100, default 100; fewer ideas may be available and the seed itself is excluded. Returns available search volume, CPC, competition, difficulty, intent, monthly trends and update timestamps. location_code defaults to 2840 (United States), language_code to en. Uses related-search and keyword databases rather than fetching webpage contents."
         ),
         "path": "/v3/dataforseo_labs/google/related_keywords/live",
         "price_cents": 5,
@@ -117,7 +109,7 @@ def provider(mode="test"):
     return {
         "provider_id": "dataforseo",
         "name": "DataForSEO",
-        "description": "Google search results and SEO keyword research: search volume, CPC, trends, difficulty, intent, and related keyword ideas.",
+        "description": "Google organic search results and SEO keyword research through three OpenMCP queries: first-page Google results, metrics for a keyword batch, and related keyword ideas. Supports location/language selection; does not provide other DataForSEO products or paid enrichment.",
         "secret_ref": "DATAFORSEO_AUTH",
         "queries": [
             {

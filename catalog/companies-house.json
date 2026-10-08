@@ -1,0 +1,250 @@
+[
+  {
+    "provider_id": "companies-house",
+    "name": "Companies House",
+    "description": "Read-only UK company-register access through company search, company profiles, paginated officers and paginated filing-history metadata. Profile accounts fields describe filing status; OpenMCP does not retrieve filing documents, extract audited financial statements or submit register changes.",
+    "secret_ref": "COMPANIES_HOUSE_API_KEY",
+    "queries": [
+      {
+        "endpoint_id": "companies-house-search",
+        "name": "Companies House Company search",
+        "description": "Find UK registered companies by query (name or search term, 1\u2013200 characters). Returns company numbers, names, statuses and available addresses/dates. items_per_page is 1\u2013100, default 20; start_index defaults to 0. Follow pagination.next_start_index for another page, purchased separately. Use the returned company_number string for profile, officers and filing-history queries. Flat $0.02 per successful request.",
+        "keywords": [
+          "UK",
+          "company",
+          "business",
+          "register",
+          "officers",
+          "filings"
+        ],
+        "url": "https://api.company-information.service.gov.uk/search/companies",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "companies_house",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "items_per_page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "start_index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Companies House"
+            },
+            "endpoint_id": {
+              "const": "companies-house-search"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "companies-house-profile",
+        "name": "Companies House Company profile",
+        "description": "Look up one UK company by company_number: exactly eight uppercase letters/digits, preserving leading zeros. Returns available name, status, incorporation date, registered office, SIC codes, previous names, accounts filing status and confirmation-statement metadata. Accounts fields are filing information, not financial statements or audited revenue/profit figures. Flat $0.02 per successful request.",
+        "keywords": [
+          "UK",
+          "company",
+          "business",
+          "register",
+          "officers",
+          "filings"
+        ],
+        "url": "https://api.company-information.service.gov.uk/company/{company_number}",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "companies_house",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "company_number": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8,
+              "pattern": "^[A-Z0-9]{8}$"
+            }
+          },
+          "required": [
+            "company_number"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Companies House"
+            },
+            "endpoint_id": {
+              "const": "companies-house-profile"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "companies-house-officers",
+        "name": "Companies House Company officers",
+        "description": "List one page of UK company officers by eight-character company_number (preserve leading zeros and uppercase prefixes). Returns available names, roles, appointment/resignation dates, nationality, occupation and addresses, plus active/resigned counts and pagination. items_per_page is 1\u2013100, default 20; start_index defaults to 0. Follow next_start_index for additional pages, purchased separately; one page may not contain every officer. Flat $0.02 per successful request.",
+        "keywords": [
+          "UK",
+          "company",
+          "business",
+          "register",
+          "officers",
+          "filings"
+        ],
+        "url": "https://api.company-information.service.gov.uk/company/{company_number}/officers",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "companies_house",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "company_number": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8,
+              "pattern": "^[A-Z0-9]{8}$"
+            },
+            "items_per_page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "start_index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          "required": [
+            "company_number"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Companies House"
+            },
+            "endpoint_id": {
+              "const": "companies-house-officers"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "companies-house-filings",
+        "name": "Companies House Filing history",
+        "description": "List one page of UK company filing history by eight-character company_number (preserve leading zeros and uppercase prefixes). Returns filing dates, types, categories, description codes/parameters and available transaction IDs. items_per_page is 1\u2013100, default 20; start_index defaults to 0. Follow pagination.next_start_index for another separately purchased page. Returns metadata, not PDFs, document contents or audited financial analysis. Flat $0.02 per successful request.",
+        "keywords": [
+          "UK",
+          "company",
+          "business",
+          "register",
+          "officers",
+          "filings"
+        ],
+        "url": "https://api.company-information.service.gov.uk/company/{company_number}/filing-history",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "companies_house",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "company_number": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8,
+              "pattern": "^[A-Z0-9]{8}$"
+            },
+            "items_per_page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "start_index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          "required": [
+            "company_number"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Companies House"
+            },
+            "endpoint_id": {
+              "const": "companies-house-filings"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
+  }
+]

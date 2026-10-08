@@ -1,0 +1,174 @@
+[
+  {
+    "provider_id": "deepgram",
+    "name": "Deepgram",
+    "description": "Work in progress: two prerecorded Nova-3 speech-to-text queries for English or supported multilingual/code-switching audio. Only public HTTPS links on operator-approved hosts to mono integer PCM WAV recordings up to 120 seconds/12 MB are supported. Returns transcript, word timestamps and optional speaker labels; no streaming, speech generation, uploads or audio conversion.",
+    "secret_ref": "DEEPGRAM_API_KEY",
+    "queries": [
+      {
+        "endpoint_id": "deepgram-transcribe-english",
+        "name": "Deepgram English audio transcription",
+        "description": "Transcribe English audio using Nova-3. audio_url must be a public HTTPS link on an operator-approved host to mono integer PCM WAV: at most 120 seconds and 12 MB, 8\u201348 kHz sample rate, 8/16/24/32-bit samples. Returns transcript, confidence, duration, word timestamps and request ID. Optional diarize (default false) adds speaker labels; smart_format defaults to true. MP3/M4A, stereo audio, local files, uploads, streaming and format conversion are not supported. Integration is work in progress. Flat $0.02 per successful request.",
+        "keywords": [
+          "audio",
+          "speech",
+          "transcribe",
+          "transcription",
+          "speakers",
+          "recording"
+        ],
+        "url": "https://api.deepgram.com/v1/listen",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "deepgram",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "audio_url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "description": "HTTPS URL to a mono PCM WAV recording, at most 120 seconds and 12 MB, on an operator-approved audio host. Not an arbitrary website or local file path."
+            },
+            "diarize": {
+              "type": "boolean",
+              "default": false,
+              "description": "Label speakers in word timestamps. Included in the prerecorded price."
+            },
+            "smart_format": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "audio_url"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Deepgram"
+            },
+            "endpoint_id": {
+              "type": "string"
+            },
+            "transcript": {
+              "type": "string"
+            },
+            "duration_seconds": {
+              "type": "number"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "words": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "request_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "transcript",
+            "duration_seconds",
+            "words",
+            "request_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "deepgram-transcribe-multilingual",
+        "name": "Deepgram Multilingual audio transcription",
+        "description": "Transcribe multilingual or code-switching audio using Nova-3's supported languages. audio_url must be a public HTTPS link on an operator-approved host to mono integer PCM WAV: at most 120 seconds and 12 MB, 8\u201348 kHz sample rate, 8/16/24/32-bit samples. Returns transcript, confidence, duration, word timestamps and request ID. Optional diarize (default false) adds speaker labels; smart_format defaults to true. MP3/M4A, stereo audio, local files, uploads, streaming and format conversion are not supported. Integration is work in progress. Flat $0.02 per successful request.",
+        "keywords": [
+          "audio",
+          "speech",
+          "transcribe",
+          "transcription",
+          "speakers",
+          "recording"
+        ],
+        "url": "https://api.deepgram.com/v1/listen",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "deepgram",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "audio_url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "description": "HTTPS URL to a mono PCM WAV recording, at most 120 seconds and 12 MB, on an operator-approved audio host. Not an arbitrary website or local file path."
+            },
+            "diarize": {
+              "type": "boolean",
+              "default": false,
+              "description": "Label speakers in word timestamps. Included in the prerecorded price."
+            },
+            "smart_format": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "audio_url"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Deepgram"
+            },
+            "endpoint_id": {
+              "type": "string"
+            },
+            "transcript": {
+              "type": "string"
+            },
+            "duration_seconds": {
+              "type": "number"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "words": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "request_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "transcript",
+            "duration_seconds",
+            "words",
+            "request_id"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
+  }
+]
