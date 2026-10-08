@@ -163,6 +163,51 @@ async def check_mcp(mode="demo"):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "api2pdf":
+        from .integrations.api2pdf.cli import main as api2pdf_main
+
+        api2pdf_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "nansen":
+        from .integrations.nansen.cli import main as nansen_main
+
+        nansen_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "builtwith":
+        from .integrations.builtwith.cli import main as builtwith_main
+
+        builtwith_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "deepgram":
+        from .integrations.deepgram.cli import main as deepgram_main
+
+        deepgram_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "companies-house":
+        from .integrations.companies_house.cli import main as companies_house_main
+
+        companies_house_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "openweather":
+        from .integrations.openweather.cli import main as openweather_main
+
+        openweather_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "exa":
+        from .integrations.exa.cli import main as exa_main
+
+        exa_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "firecrawl":
+        from .integrations.firecrawl.cli import main as firecrawl_main
+
+        firecrawl_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "tavily":
+        from .integrations.tavily.cli import main as tavily_main
+
+        tavily_main(sys.argv[2:])
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "dataforseo":
         from .integrations.dataforseo.cli import main as dataforseo_main
 
@@ -181,6 +226,15 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("creator", help="URL-to-paid-service worker; see creator --help")
     commands.add_parser("dataforseo", help="DataForSEO catalog, sandbox checks, and upstream MCP")
+    commands.add_parser("tavily", help="Tavily catalog and one-credit live verification")
+    commands.add_parser("builtwith", help="BuiltWith catalog and registration")
+    commands.add_parser("api2pdf", help="API2PDF catalog and registration")
+    commands.add_parser("nansen", help="Nansen catalog and registration")
+    commands.add_parser("deepgram", help="Deepgram catalog and registration")
+    commands.add_parser("companies-house", help="Companies House catalog and registration")
+    commands.add_parser("openweather", help="OpenWeather catalog and database registration")
+    commands.add_parser("exa", help="Exa service catalog and database registration")
+    commands.add_parser("firecrawl", help="Firecrawl service catalog and database registration")
     register_commands(commands)
     connect = commands.add_parser("connect", help="Save an account agent credential privately")
     connect.add_argument("--base-url", required=True, help="HTTPS account API origin")

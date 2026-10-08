@@ -20,7 +20,21 @@ def migration_sql(schema="openmcp_product"):
     files = migration_files()
     if not files:
         raise RuntimeError("Packaged account migrations are missing")
-    return "\n".join(p.read_text() for p in files).replace("openmcp_product", schema)
+    combined = "\n".join(p.read_text() for p in files)
+    # This operator/bootstrap command replays the idempotent SQL in one transaction.
+    # Older adapter checks would reject rows using a newer protocol before the
+    # last migration widens the check. Validate only the latest allowed set.
+    # Supabase still applies the original, unchanged files individually.
+    checks = list(
+        re.finditer(
+            r"ALTER TABLE queries ADD CONSTRAINT queries_adapter_check\s+"
+            r"CHECK \(adapter IN \([^;]+\)\);",
+            combined,
+        )
+    )
+    for check in reversed(checks[:-1]):
+        combined = combined[: check.start()] + combined[check.end() :]
+    return combined.replace("openmcp_product", schema)
 
 
 def migrate(dsn, schema="openmcp_product"):

@@ -73,7 +73,19 @@ class Service(BaseModel):
     url: str
     recipient: str = ""
     settlement: Literal["mpp", "api_key"] = "mpp"
-    adapter: Literal["http", "dataforseo"] = "http"
+    adapter: Literal[
+        "http",
+        "dataforseo",
+        "tavily",
+        "firecrawl",
+        "exa",
+        "openweather",
+        "companies_house",
+        "deepgram",
+        "builtwith",
+        "nansen",
+        "api2pdf",
+    ] = "http"
     price_cents: int = Field(ge=2, le=1_000_000)
     input_schema: dict
     output_schema: dict = Field(default_factory=lambda: {"type": "object"})
@@ -94,6 +106,60 @@ class Service(BaseModel):
 
             if self.settlement != "api_key":
                 raise ValueError("DataForSEO uses prepaid API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "tavily":
+            from openmcp.integrations.tavily.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Tavily uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "firecrawl":
+            from openmcp.integrations.firecrawl.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Firecrawl uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "exa":
+            from openmcp.integrations.exa.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Exa uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "openweather":
+            from openmcp.integrations.openweather.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("OpenWeather uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "companies_house":
+            from openmcp.integrations.companies_house.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Companies House uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "api2pdf":
+            from openmcp.integrations.api2pdf.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("API2PDF uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "nansen":
+            from openmcp.integrations.nansen.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Nansen uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "builtwith":
+            from openmcp.integrations.builtwith.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("BuiltWith uses API credentials, not MPP settlement")
+            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.adapter == "deepgram":
+            from openmcp.integrations.deepgram.protocol import validate_target
+
+            if self.settlement != "api_key":
+                raise ValueError("Deepgram uses API credentials, not MPP settlement")
             validate_target(self.endpoint_id, self.url, self.mode)
         if self.settlement == "mpp":
             if not is_address(self.recipient):
@@ -116,9 +182,20 @@ class Service(BaseModel):
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
         }
-        if self.adapter == "dataforseo":
+        if self.adapter in {
+            "dataforseo",
+            "tavily",
+            "firecrawl",
+            "exa",
+            "openweather",
+            "companies_house",
+            "deepgram",
+            "builtwith",
+            "nansen",
+            "api2pdf",
+        }:
             # The wholesale charge varies with results and can be fractional cents.
-            # Do not advertise the legacy MPP split as a DataForSEO price quote.
+            # Do not advertise the legacy MPP split as an API-key vendor price quote.
             result.pop("provider_price_cents")
             result.pop("platform_fee_cents")
         return result

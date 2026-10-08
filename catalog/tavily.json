@@ -1,0 +1,407 @@
+[
+  {
+    "provider_id": "tavily",
+    "name": "Tavily",
+    "description": "Basic and advanced web search with general/news/finance topic filters, Markdown extraction from batches of up to five public HTTPS pages, and one-level website URL mapping. Finance means web search about finance, not a financial database. OpenMCP does not expose Tavily answer generation or recursive crawling.",
+    "secret_ref": "TAVILY_API_KEY",
+    "queries": [
+      {
+        "endpoint_id": "tavily-web-search",
+        "name": "Tavily Basic web search",
+        "description": "Find web sources for query (1\u2013400 characters) using basic search. Returns titles, URLs and content excerpts, not full pages or a generated answer. max_results is 1\u201320, default 10. Optional topic general/news/finance (default general), time_range day/week/month/year, and include_domains/exclude_domains (up to ten each). Uses one Tavily search credit.",
+        "keywords": [
+          "web",
+          "search",
+          "news",
+          "research"
+        ],
+        "url": "https://api.tavily.com/search",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "tavily",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 10
+            },
+            "topic": {
+              "type": "string",
+              "enum": [
+                "general",
+                "news",
+                "finance"
+              ],
+              "default": "general"
+            },
+            "time_range": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            },
+            "include_domains": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+              }
+            },
+            "exclude_domains": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+              }
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Tavily"
+            },
+            "endpoint_id": {
+              "const": "tavily-web-search"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "results"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "tavily-advanced-search",
+        "name": "Tavily Advanced web search",
+        "description": "Find web sources for query (1\u2013400 characters) using advanced search depth and content chunks. Returns titles, URLs and excerpts, not full pages or a generated answer. max_results is 1\u201320, default 10. Optional topic general/news/finance (default general), time_range day/week/month/year, and include_domains/exclude_domains (up to ten each). Uses two Tavily search credits.",
+        "keywords": [
+          "web",
+          "search",
+          "news",
+          "research"
+        ],
+        "url": "https://api.tavily.com/search",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "tavily",
+        "price_cents": 3,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 10
+            },
+            "topic": {
+              "type": "string",
+              "enum": [
+                "general",
+                "news",
+                "finance"
+              ],
+              "default": "general"
+            },
+            "time_range": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            },
+            "include_domains": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+              }
+            },
+            "exclude_domains": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+              }
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Tavily"
+            },
+            "endpoint_id": {
+              "const": "tavily-advanced-search"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "results"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "tavily-extract",
+        "name": "Tavily Extract webpage content",
+        "description": "Read one to five unique public HTTPS urls using basic extraction. Returns Markdown content per successful URL and failed_results for failures. Optional query (1\u2013400 characters) selects relevant content chunks instead of unfocused page content. A partial batch is returned with partial_success; the flat batch price applies if any URL succeeds. Does not crawl linked pages.",
+        "keywords": [
+          "web",
+          "website",
+          "extract",
+          "content",
+          "map"
+        ],
+        "url": "https://api.tavily.com/extract",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "tavily",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "pattern": "^https://"
+              }
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            }
+          },
+          "required": [
+            "urls"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Tavily"
+            },
+            "endpoint_id": {
+              "const": "tavily-extract"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "results"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "tavily-advanced-extract",
+        "name": "Tavily Advanced webpage extraction",
+        "description": "Read one to five unique public HTTPS urls using advanced extraction depth. Returns Markdown content per successful URL and failed_results for failures. Optional query (1\u2013400 characters) selects relevant chunks. Choose this when advanced extraction is needed; success is not guaranteed. A partial batch is returned with partial_success; the flat batch price applies if any URL succeeds. Does not crawl linked pages.",
+        "keywords": [
+          "web",
+          "website",
+          "extract",
+          "content",
+          "map"
+        ],
+        "url": "https://api.tavily.com/extract",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "tavily",
+        "price_cents": 3,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "pattern": "^https://"
+              }
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            }
+          },
+          "required": [
+            "urls"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Tavily"
+            },
+            "endpoint_id": {
+              "const": "tavily-advanced-extract"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "results"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "tavily-map",
+        "name": "Tavily Map website URLs",
+        "description": "Discover links from a public HTTPS website url, one link level deep. limit is 1\u201350, default 20. Returns results as URL strings, not page contents. External links are excluded. Use extraction separately to read selected pages. No recursive crawling or natural-language mapping instructions. Flat price per map request.",
+        "keywords": [
+          "web",
+          "website",
+          "extract",
+          "content",
+          "map"
+        ],
+        "url": "https://api.tavily.com/map",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "tavily",
+        "price_cents": 5,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "pattern": "^https://"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Tavily"
+            },
+            "endpoint_id": {
+              "const": "tavily-map"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "results"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
+  }
+]

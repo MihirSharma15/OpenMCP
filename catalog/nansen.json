@@ -1,0 +1,395 @@
+[
+  {
+    "provider_id": "nansen",
+    "name": "Nansen",
+    "description": "Read-only indexed blockchain data through wallet token balances, dated wallet transaction history and current token market screening. Supported chains: ethereum, base, arbitrum, optimism, polygon, bnb, avalanche and solana. No proprietary Smart Money feed. This OpenMCP integration cannot place trades, submit orders, sign transactions or transfer funds.",
+    "secret_ref": "NANSEN_API_KEY",
+    "queries": [
+      {
+        "endpoint_id": "nansen-wallet-balances",
+        "name": "Nansen Wallet token balances",
+        "description": "Read one page of token balances for address on one supported chain. EVM addresses use 0x plus 40 hex characters; Solana uses a base58 32-byte public key. Returns token amounts and available prices/USD values; spam tokens are hidden. page defaults to 1; limit is 1\u2013100, default 20. Follow pagination.next_page for more records; each additional page is a separate purchase, and one page is not the wallet's entire portfolio. Read-only data query: cannot place trades, submit orders, sign transactions or transfer funds. Flat $0.02 per successful request. Attribute returned data to Nansen (https://nansen.ai).",
+        "keywords": [
+          "blockchain",
+          "crypto",
+          "wallet",
+          "tokens",
+          "transactions"
+        ],
+        "url": "https://api.nansen.ai/api/v1/profiler/address/current-balance",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "nansen",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "enum": [
+                "ethereum",
+                "base",
+                "arbitrum",
+                "optimism",
+                "polygon",
+                "bnb",
+                "avalanche",
+                "solana"
+              ]
+            },
+            "address": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 44,
+              "not": {
+                "const": "0x0000000000000000000000000000000000000000"
+              },
+              "description": "EVM: 0x followed by 40 hex characters; the zero/burn address is unsupported. Solana: a base58-encoded 32-byte public key."
+            },
+            "page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          "required": [
+            "chain",
+            "address"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Nansen"
+            },
+            "endpoint_id": {
+              "const": "nansen-wallet-balances"
+            },
+            "data": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object"
+              }
+            },
+            "pagination": {
+              "type": "object"
+            },
+            "attribution": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "data",
+            "pagination",
+            "attribution"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "nansen-wallet-transactions",
+        "name": "Nansen Wallet transactions",
+        "description": "Read one page of indexed wallet transactions for chain and address, newest first. Requires date.from and date.to as YYYY-MM-DD, ordered and at most 31 days apart. Returns hashes, timestamps and available token transfers/transaction metadata; spam tokens are hidden. page defaults to 1; limit is 1\u2013100, default 20. Follow pagination.next_page for another separately purchased page. Results are not guaranteed to be a complete wallet history. Read-only data query: cannot place trades, submit orders, sign transactions or transfer funds. Flat $0.02 per successful request. Attribute returned data to Nansen (https://nansen.ai).",
+        "keywords": [
+          "blockchain",
+          "crypto",
+          "wallet",
+          "tokens",
+          "transactions"
+        ],
+        "url": "https://api.nansen.ai/api/v1/profiler/address/transactions",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "nansen",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "enum": [
+                "ethereum",
+                "base",
+                "arbitrum",
+                "optimism",
+                "polygon",
+                "bnb",
+                "avalanche",
+                "solana"
+              ]
+            },
+            "address": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 44,
+              "not": {
+                "const": "0x0000000000000000000000000000000000000000"
+              },
+              "description": "EVM: 0x followed by 40 hex characters; the zero/burn address is unsupported. Solana: a base58-encoded 32-byte public key."
+            },
+            "page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "date": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(?![\\s\\S])"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(?![\\s\\S])"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "chain",
+            "address",
+            "date"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Nansen"
+            },
+            "endpoint_id": {
+              "const": "nansen-wallet-transactions"
+            },
+            "data": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object"
+              }
+            },
+            "pagination": {
+              "type": "object"
+            },
+            "attribution": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "data",
+            "pagination",
+            "attribution"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      },
+      {
+        "endpoint_id": "nansen-token-screener",
+        "name": "Nansen Token screener",
+        "description": "Screen current token metrics for chains (1\u20135 supported chains) and timeframe (5m, 10m, 1h, 6h, 24h, 7d or 30d). Returns available price, volume, liquidity and market metrics. Optional filters: liquidity, market_cap_usd, volume min/max ranges, include_stablecoins and include_native_tokens. sort_by defaults to volume and direction to DESC; page defaults to 1; limit is 1\u2013100, default 20. Follow pagination.next_page for another separately purchased page. Current general-market snapshot only; no historical backtesting or proprietary Smart Money feed. Read-only data query: cannot place trades, submit orders, sign transactions or transfer funds. Flat $0.02 per successful request. Attribute returned data to Nansen (https://nansen.ai).",
+        "keywords": [
+          "blockchain",
+          "crypto",
+          "wallet",
+          "tokens",
+          "transactions"
+        ],
+        "url": "https://api.nansen.ai/api/v1/token-screener",
+        "recipient": "",
+        "settlement": "api_key",
+        "adapter": "nansen",
+        "price_cents": 2,
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "chains": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "ethereum",
+                  "base",
+                  "arbitrum",
+                  "optimism",
+                  "polygon",
+                  "bnb",
+                  "avalanche",
+                  "solana"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true
+            },
+            "timeframe": {
+              "enum": [
+                "5m",
+                "10m",
+                "1h",
+                "6h",
+                "24h",
+                "7d",
+                "30d"
+              ]
+            },
+            "page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "filters": {
+              "type": "object",
+              "properties": {
+                "liquidity": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                "market_cap_usd": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                "volume": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                "include_stablecoins": {
+                  "type": "boolean"
+                },
+                "include_native_tokens": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "sort_by": {
+              "enum": [
+                "volume",
+                "liquidity",
+                "market_cap_usd",
+                "price_change",
+                "netflow",
+                "token_age_days"
+              ],
+              "default": "volume"
+            },
+            "direction": {
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "default": "DESC"
+            }
+          },
+          "required": [
+            "chains",
+            "timeframe"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "const": "Nansen"
+            },
+            "endpoint_id": {
+              "const": "nansen-token-screener"
+            },
+            "data": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object"
+              }
+            },
+            "pagination": {
+              "type": "object"
+            },
+            "attribution": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "provider",
+            "endpoint_id",
+            "data",
+            "pagination",
+            "attribution"
+          ]
+        },
+        "enabled": true,
+        "mode": "test",
+        "supports_idempotency": true
+      }
+    ]
+  }
+]
