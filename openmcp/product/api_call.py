@@ -5,6 +5,7 @@ not placed on the execution, and not taken from the catalog JSON. secret_ref
 is only the variable name, looked up from the provider row.
 """
 
+import logging
 import os
 
 import httpx
@@ -15,6 +16,7 @@ from .models import ProductError, canonical
 from .settlement import TerminalFailure
 
 _MAX_RESPONSE_BYTES = 1_000_000
+log = logging.getLogger(__name__)
 
 
 class ApiKeyCaller:
@@ -70,6 +72,12 @@ class ApiKeyCaller:
         except TerminalFailure:
             raise
         except Exception as exc:
+            # Log the category, never the raw error, headers, or credentials.
+            log.warning(
+                "Provider response failure execution_id=%s error=%s",
+                row["execution_id"],
+                type(exc).__name__,
+            )
             raise TerminalFailure("Provider request failed after it was sent.") from exc
         receipt = {"method": "api_key", "status": "success"}
         cost = None
@@ -107,9 +115,9 @@ class ApiKeyCaller:
                 content.extend(chunk)
                 if len(content) > _MAX_RESPONSE_BYTES:
                     raise TerminalFailure("Provider response exceeded the maximum size.")
-            return httpx.Response(
-                response.status_code, headers=response.headers, content=bytes(content)
-            )
+            # aiter_bytes() has already decompressed the body. Reusing wire
+            # Content-Encoding headers would make HTTPX decode it a second time.
+            return httpx.Response(response.status_code, content=bytes(content))
 
     @staticmethod
     def _object(response, *, require_success=True):

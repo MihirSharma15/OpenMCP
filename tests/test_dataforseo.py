@@ -1,7 +1,9 @@
 """Bounded vendor requests, fractional costs, and the account purchase lifecycle."""
 
 import base64
+import gzip
 import json
+import zlib
 from unittest.mock import Mock
 
 import httpx
@@ -13,6 +15,7 @@ from openmcp.integrations.dataforseo.protocol import Rejected, cost_microusd, pa
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
 from openmcp.product.config import ProductSettings, Provider
+from openmcp.product.settlement import TerminalFailure
 from openmcp.product.worker import Worker
 from tests import test_product_api_call as api_tests
 from tests.test_product_api_call import Closable, credit, grant
@@ -170,7 +173,8 @@ def test_catalog_command_preserves_other_providers(tmp_path):
     assert len(catalog[1]["queries"]) == 3
 
 
-async def test_discover_execute_replay_and_saved_receipt_in_postgres(store, monkeypatch):
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+async def test_discover_execute_replay_and_saved_receipt_in_postgres(store, monkeypatch, encoding):
     monkeypatch.setenv("DATAFORSEO_AUTH", SECRET)
     settings = ProductSettings(_env_file=None)
     store.sync_catalog([Provider.model_validate(provider())])
@@ -188,7 +192,20 @@ async def test_discover_execute_replay_and_saved_receipt_in_postgres(store, monk
         )
         assert request.headers["authorization"] == "Basic " + SECRET
         assert isinstance(json.loads(request.content), list)
-        return httpx.Response(200, json=envelope(endpoint))
+        body = json.dumps(envelope(endpoint)).encode()
+        if encoding == "gzip":
+            body = gzip.compress(body)
+        elif encoding == "deflate":
+            body = zlib.compress(body)
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": "application/json",
+                "Content-Encoding": encoding,
+                "Content-Length": str(len(body)),
+            },
+            stream=httpx.ByteStream(body),
+        )
 
     caller = ApiKeyCaller(settings, store, transport=httpx.MockTransport(handler))
     worker = Worker(settings, store, Mock(), api_caller=caller)
@@ -231,6 +248,24 @@ async def test_discover_execute_replay_and_saved_receipt_in_postgres(store, monk
             await worker.tick()
             assert len(calls) == 3
             assert store.account(principal.account_id)["spent_cents"] == 12
+    finally:
+        await caller.close()
+
+
+async def test_compressed_response_limit_applies_to_decoded_body():
+    body = gzip.compress(b"x" * 1_000_001)
+
+    def handler(request):
+        return httpx.Response(
+            200, headers={"Content-Encoding": "gzip"}, stream=httpx.ByteStream(body)
+        )
+
+    caller = ApiKeyCaller(
+        ProductSettings(_env_file=None), Mock(), transport=httpx.MockTransport(handler)
+    )
+    try:
+        with pytest.raises(TerminalFailure, match="exceeded the maximum size"):
+            await caller._post(service_for(SEARCH), "[]", {})
     finally:
         await caller.close()
 
