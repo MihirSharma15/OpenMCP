@@ -1,191 +1,108 @@
-# API Creator: use Modal and third-party providers
+# API Creator
 
-**Team direction: use Modal for Creator compute and hosted adapters, and use
-third-party providers for inference, managed browsers, and subscription billing.**
-OpenMCP owns the workflow, spending policy, service registry, and paid execution
-contract. Keep provider integrations replaceable.
-
-| Capability | Direction | Status now |
-| --- | --- | --- |
-| Worker execution and adapter hosting | [Modal](https://modal.com/docs/guide/webhooks), with isolated jobs and FastAPI/ASGI services | Local worker and FastAPI host implemented; Modal deployment is next |
-| Inference | Third-party model API; configure provider URL, key, and model | OpenAI-compatible Chat Completions JSON client implemented. Native Anthropic would need another client |
-| Browser sessions | Third-party managed browsers such as [Browserbase](https://docs.browserbase.com/introduction) | Local Playwright/Chromium implemented; managed session provider is next |
-| Subscription funding/cards | Third-party card provider; coordinate with [AgentCard work](../docs/backend/agentcard.md) | Account/card primitives exist elsewhere in the repo; Creator has no card issuance or automatic subscription checkout integration |
-| API/data sources | Providers' documented APIs or authorized browser access | JSON GET and rendered-text adapters implemented |
-
-Modal, Browserbase, and automatic subscriptions are **not wired up yet**.
-This implementation is a local, single-operator vertical slice. Its seams
-(`Inference`, `Browser`, `AdapterRuntime`, and `Worker`) are intended for these
-hosted integrations. No inference vendor/model is selected silently.
-
-## What runs today
+Creator investigates an approved public URL, proposes a bounded adapter, and runs a
+sample against the source. A successful job becomes `ready`. An operator then
+publishes it into the prepaid account catalog using the same operation as built-in
+providers. Creator hosts authenticated HTTP endpoints; the account worker reserves
+credits, calls the endpoint and captures the advertised price.
 
 ```text
-URL + goal + price + receiving wallet
-  -> durable Creator job
-  -> browser research + configured inference API
-  -> documentation / pricing / signup investigation
-  -> credential or approved browser action when needed
-  -> validated declarative adapter
-  -> real upstream sample + unpaid MPP challenge check
-  -> hosted FastAPI route + persistent registry entry
-  -> OpenMCP discover / execute -> existing two-hop MPP payments
+URL + goal + retail price
+  → queued → running → ready
+                 ↕         → explicit publication → account discovery/purchase
+             needs_input
 ```
 
-The model produces a typed adapter specification, not unrestricted Python.
-The runtime compiles it into a typed FastAPI function using `OpenMCPProvider`.
-Validation, receipts, retries, and cached paid responses reuse the provider SDK.
-Callers use OpenMCP's existing MCP tools without installing each generated service.
-
-Generated services default to the `openmcp` receiving wallet. This retains service
-proceeds in the service wallet, including a self-transfer on the provider hop.
-Use `--wallet` to select another initialized receiving wallet. Prices are
-**valueless Tempo testnet pathUSD**, not subscription funding or real USD.
-
-## Run locally
+## Local setup
 
 ```bash
 uv sync --extra creator
 uv run playwright install chromium
-uv run openmcp init
 ```
 
-Set these in your ignored `.env`:
+Set the following privately in `.env` (see the root `.env.example`):
 
-```dotenv
-OPENMCP_CREATOR_INFERENCE_BASE_URL=https://api.openai.com/v1
-OPENMCP_CREATOR_INFERENCE_API_KEY=your-provider-key
-OPENMCP_CREATOR_MODEL=your-provider-model-id
-OPENMCP_CREATOR_BASE_URL=http://127.0.0.1:9002
-```
-
-The provider must accept Chat Completions, `response_format: json_object`, and
-`max_completion_tokens`. Output is validated locally. See the
-[inference API contract](https://developers.openai.com/api/docs/guides/structured-outputs).
-Inference is billed by that provider: `max_steps` and output-token limits bound
-calls but do not enforce a dollar-denominated inference budget.
-
-Run these in separate terminals:
+- `OPENMCP_CREATOR_ADMIN_TOKEN`: at least 16 characters, for job administration.
+- `OPENMCP_CREATOR_API_TOKEN`: a different token of at least 16 characters, shared
+  with the account worker for generated service calls.
+- `OPENMCP_CREATOR_MODEL` and `OPENMCP_CREATOR_INFERENCE_API_KEY`: your configured
+  inference model and credential. `OPENMCP_CREATOR_INFERENCE_BASE_URL` selects an
+  OpenAI-compatible chat-completions endpoint. No model is chosen automatically.
+- `OPENMCP_CREATOR_BASE_URL`: the origin the account worker can reach, default
+  `http://127.0.0.1:9002`. Live account publication requires public HTTPS.
 
 ```bash
-uv run openmcp serve
 uv run openmcp creator serve
-```
-
-Submit a source you have permission to expose:
-
-```bash
-uv run openmcp creator create https://example.com/docs \
-  --goal 'Expose its documented weather lookup as a paid tool' \
-  --price-cents 40 --allow-origin https://api.example.com \
-  --key weather-service-001
+uv run openmcp creator create https://source.example/docs --price-cents 40 \
+  --goal "Look up current weather by city"
 uv run openmcp creator status
-uv run openmcp creator status created-JOB_ID
+uv run openmcp creator status JOB_ID
 ```
 
-Replace the example URL and job ID. The initial URL origin is authorized for
-adapter access; additional API/signup origins must be declared explicitly.
-Research can read other public HTTPS documentation. Credentials remain scoped
-to one job and origin. Private, metadata, and loopback addresses are rejected;
-`OPENMCP_CREATOR_ALLOW_LOOPBACK=true` is a local development exception only.
+The server binds to localhost on port 9002 by default (`--port` overrides it).
+For hosted use, put a reverse proxy in front and set the public base URL. Run one
+Creator process with persistent storage. It includes the research worker and
+service host; neither belongs in an ephemeral serverless request handler.
+Research, inference and sample validation can consume third-party quota or credit.
 
-REST equivalents on port 9002: `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, and
-`POST /jobs/{id}/resume`, authenticated with `OPENMCP_API_TOKEN`. Job creation
-accepts `url`, `goal`, `price_cents`, `wallet`, `allowed_origins`, `max_steps`, and
-`idempotency_key`. Reusing identical input/key returns the job; different input
-with the same key returns 409. The CLI shares the local database.
+## Review and publication
 
-## Signup, credentials, and subscriptions
-
-Jobs pause in `needs_input` with a requirement or proposed browser action.
-Review `pending_action` through `status`, then approve that exact action:
+Review the ready job's adapter, source evidence, input and sample before publishing.
+Configure the account database and apply its migrations as described in
+[operations](../docs/operations.md), then:
 
 ```bash
-uv run openmcp creator resume created-JOB_ID --approve-action
+uv run openmcp creator publish JOB_ID
+uv run openmcp providers list
+uv run openmcp providers enable JOB_ID
 ```
 
-Actions support clicking, filling with a named secret, and capturing an API key
-from a selected input/element directly into the vault. Approved fills survive
-browser restarts. The worker checkpoints before an action; uncertain outcomes
-require account inspection and are never automatically submitted again.
+Publication defaults to disabled. `publish JOB_ID --enable` combines publication
+and activation when the service is ready for purchases. The worker environment
+must contain `OPENMCP_CREATOR_API_TOKEN` matching the host. Neither discovery nor
+catalog exports disclose its value. Creator does not need crypto wallets or a
+provider-payment SDK. Source cost remains unknown when no measured cost is
+available; receipts do not invent a wholesale/retail split.
 
-To supply credentials and continue:
+## Credentials and account setup
+
+Signup, form submission and other browser interactions pause for approval of the
+exact proposed action. Check `status JOB_ID`, complete any manual account steps,
+and resume explicitly:
 
 ```bash
-uv run openmcp creator secret created-JOB_ID api-key --origin https://api.example.com
-uv run openmcp creator resume created-JOB_ID --note 'Subscription setup is complete; use api-key.'
+uv run openmcp creator secret JOB_ID api-key --origin https://source.example
+uv run openmcp creator resume JOB_ID --approve-action --note "Account setup complete"
 ```
 
-The credential prompt is hidden. Credentials/browser storage are encrypted in
-`.openmcp/creator/vault/`; model context and generated specs use secret references.
-Protect that directory: the local encryption key sits alongside ciphertext, so
-this is not a production KMS boundary. Never paste credentials into goals, notes,
-source URLs, or action reasons.
+The secret command prompts without echoing the value. Credentials and browser state
+are encrypted in the local vault and scoped to approved origins. Never put secrets
+in a goal or resume note. Additional origins must be specified with `--allow-origin`
+when creating the job. CAPTCHA, email verification, account purchases and changed
+or ambiguous browser actions may require manual intervention. A pending action
+interrupted after submission is not automatically replayed. Document redirects
+pass through the checked transport; redirects that resubmit a form, move an
+authenticated request to another origin, or redirect a subresource are blocked.
 
-Paid subscriptions currently pause for account/billing setup. Tempo testnet funds
-cannot pay a conventional card checkout. The billing integration must bind an owned
-AgentCard connection, reserve an explicit spending grant, and persist merchant,
-plan, amount, currency, renewal period, transaction reference and status. Reconcile
-uncertain charges before retries. Add cancellation and renewal policy as durable
-operations. Do not give the investigating model unrestricted card-provider keys.
+## Hosting and recovery
 
-After a sample failure, resume to retry the saved adapter. Use `--regenerate` with
-a corrective `--note` to investigate again within the original step limit.
-CAPTCHA/MFA/email verification, unsupported API methods, and exhausted steps remain
-explicit requirements rather than fabricated success.
+The admin bearer token protects `/jobs`, `/jobs/{id}` and `/jobs/{id}/resume`.
+The separate service bearer token protects `POST /{job_id}`. Service calls require
+an `Idempotency-Key` and schema-valid JSON. `/health` is public.
 
-## State and integration contract
+`OPENMCP_CREATOR_STATE_DIR` defaults to `.openmcp/creator`. Its `jobs.sqlite3`
+contains job checkpoints and the service-call journal; its vault holds secrets and
+browser state. Back up the entire directory together and keep it private. The
+account catalog and monetary ledger stay in PostgreSQL. Existing demo jobs are not
+migrated automatically; recreate and validate them in the new job store.
 
-- `creator.sqlite3`, next to the gateway database, stores jobs, leases,
-  observations, and registrations. Local processes must share this database.
-- `.openmcp/creator/services/{id}/` contains `adapter.json`, `catalog.json`, and
-  private provider receipt/replay state. Paths follow `OPENMCP_DATABASE`.
-- States: `queued -> running -> ready` or `needs_input`. Expired research leases
-  resume; uncertain browser mutations require inspection. Step counts survive
-  restart. Sample validation makes a real upstream read and may consume quota.
-- Only validated services enter the registry. The gateway refreshes it during
-  discovery/execution. Authenticated `GET /endpoints/{id}` supplies remote terms;
-  the agent checks recipient, network, token, execution path, and user spending
-  limits before signing. Endpoint IDs and payment terms remain immutable.
-- Ownership is still single-operator. These terms do not implement the future
-  multi-tenant, expiring quote protocol.
-- Run one Creator host. SQLite claims prevent duplicate research jobs, but provider
-  locks and wallet nonces are not distributed. Browser/network checks are defense
-  in depth; production needs container-level egress enforcement.
-
-## Modal implementation handoff
-
-1. Package Creator and browser dependencies in a Modal image. Run bounded research
-   jobs in isolated [Modal Sandboxes](https://modal.com/docs/guide/sandbox-networking)
-   with network restrictions outside the browser.
-2. Move job/registry/payment state to a transactional shared database. Do not put
-   local SQLite on a shared filesystem and scale payment workers. Preserve lease
-   fencing, idempotency keys, and receipt persistence.
-3. Add a managed-browser factory with the existing read/interact interface.
-   Bind provider sessions to job/credential scope and persist resumable session
-   references. Keep local Playwright for tests/development.
-4. Deploy generated FastAPI apps with Modal ASGI hosting. Register stable hosted
-   URLs after sample validation and MPP checks. Add revision, disable, rollback,
-   health monitoring, and credential-rotation operations.
-5. Connect subscription grants and AgentCard lifecycle to durable Creator actions.
-   Account for source subscription costs separately from per-call revenue.
-6. Integrate the hosted registry and quote/ownership system from the backend
-   roadmap. SDK-authored and Creator-authored services join the same registry.
-
-## Verification and limits
+A completed service call replays its saved result for the same key and input. A
+conflicting payload is rejected. An interrupted or failed source call stays pending
+for operator review; it is never automatically repeated. Account recovery also
+retains uncertain reservations for review. There is no automatic subscription
+purchase, arbitrary generated-code execution, provider self-service dashboard or
+multi-tenant isolation in this operator-controlled host.
 
 ```bash
-uv run pytest -q tests/test_creator.py
-uv run ruff check openmcp_creator
+uv run pytest tests/test_creator.py tests/test_creator_account.py -q
 ```
-
-Tests cover restart/lease behavior, approvals, credential scope, address/redirect
-checks, inference output, registration, and a generated-service purchase/replay
-using the real MPP SDK with simulated settlement. The optional Chrome test executes
-JavaScript in a real browser against controlled HTTP fixtures. Tests do not buy
-real subscriptions.
-
-Supported today: JSON GET with scalar query inputs and rendered page text.
-Arbitrary generated Python, POST APIs, complex extraction, autonomous card checkout,
-distributed hosting, and arbitrary-site success are not implemented. A URL starts
-an investigation; it cannot guarantee API availability or redistribution rights.

@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
+from openmcp.integrations.builtwith import adapter as builtwith_adapter
 from openmcp.integrations.builtwith.catalog import ORIGIN, SERVICES, SUMMARY, TRENDS, provider
 from openmcp.integrations.builtwith.protocol import parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
@@ -153,12 +154,11 @@ async def test_calls_are_spaced():
         ProductSettings(_env_file=None), Mock(), transport=httpx.MockTransport(handler)
     )
     try:
-        body = json.dumps({"LOOKUP": "example.com"})
+        request = await builtwith_adapter.prepare(
+            service(SUMMARY), {"domain": "example.com"}, SECRET, caller.http, 30
+        )
         await asyncio.gather(
-            *(
-                caller._post(service(SUMMARY), body, {"Authorization": "Bearer " + SECRET})
-                for _ in range(2)
-            )
+            *(caller._send("builtwith", builtwith_adapter, request) for _ in range(2))
         )
         assert starts[1] - starts[0] >= 1
     finally:

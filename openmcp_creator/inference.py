@@ -23,10 +23,9 @@ actions require explicit approval. capture_secret copies a credential from a CSS
 input or element directly into the vault under secret_name. Password/card/email values must
 never appear literally.
 If paid, describe the plan, price, recurring period, signup URL and required billing method
-in needs_input. The Tempo testnet wallet cannot purchase a card subscription. Never claim
-it can. CAPTCHA, email verification, MFA, unclear data resale permission, or unsupported API
+in needs_input. Subscriptions require operator-managed funding. CAPTCHA, email verification, MFA, unclear data resale permission, or unsupported API
 methods require needs_input explaining what is missing. Do not evade access controls.
-Do not change requested per-call price or wallet. Return only a JSON object matching schema.
+Do not change the requested per-call price. Return only a JSON object matching schema.
 """
 
 

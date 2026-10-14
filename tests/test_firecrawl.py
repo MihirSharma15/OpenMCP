@@ -15,7 +15,6 @@ from openmcp.integrations.firecrawl.catalog import (
     SERVICES,
     provider,
 )
-from openmcp.integrations.firecrawl.cli import write_catalog
 from openmcp.integrations.firecrawl.protocol import credit_rate, parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -207,18 +206,6 @@ def test_all_services_enabled_and_urls_auth_prices_are_private():
     bad["queries"][0].update(url=ORIGIN + "/scrape", settlement="mpp")
     with pytest.raises(ValueError):
         Provider.model_validate(bad)
-
-
-def test_catalog_merges_without_deleting_tavily(tmp_path):
-    from openmcp.integrations.tavily.catalog import provider as tavily
-
-    path = tmp_path / "all.json"
-    path.write_text(json.dumps([tavily()]))
-    write_catalog(path, "test")
-    write_catalog(path, "test")
-    entries = json.loads(path.read_text())
-    assert [p["provider_id"] for p in entries] == ["tavily", "firecrawl"]
-    assert SECRET not in path.read_text()
 
 
 @pytest.mark.parametrize("endpoint_id", [SCRAPE, HTML, SEARCH, MAP])

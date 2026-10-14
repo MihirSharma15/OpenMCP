@@ -1,4 +1,4 @@
-"""Account-credit MCP tools, isolated from the legacy demo signer."""
+"""Account-credit MCP tools for agents."""
 
 import json
 from contextlib import asynccontextmanager
@@ -10,7 +10,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from .account_client import AccountClient, AccountSettings
-from .models import OpenMCPError
+from .errors import OpenMCPError
 
 INSTRUCTIONS = """OpenMCP purchases services using the user's prepaid USD credits.
 Obtain an explicit task budget before buying. Read balance: wallet funds and the owner's

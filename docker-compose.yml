@@ -1,4 +1,4 @@
-# Local credit-ledger Postgres. Tests use localhost:5433 and skip when this is down.
+# Local account PostgreSQL. Tests use localhost:5433 and skip when this is down.
 services:
   postgres:
     image: postgres:16

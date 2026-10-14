@@ -7,7 +7,6 @@ import httpx
 import pytest
 
 from openmcp.integrations.openweather.catalog import CURRENT, FORECAST, ORIGIN, SERVICES, provider
-from openmcp.integrations.openweather.cli import write_catalog
 from openmcp.integrations.openweather.protocol import parse, prepare, request_cost
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -99,13 +98,7 @@ def test_unusable_forecast_needs_review(issue):
         parse(FORECAST, payload, body, 0)
 
 
-def test_routes_and_merged_catalog_preserve_existing(tmp_path):
-    from openmcp.integrations.exa.catalog import provider as exa
-
-    path = tmp_path / "catalog.json"
-    path.write_text(json.dumps([exa()]))
-    write_catalog(path, "test")
-    assert [p["provider_id"] for p in json.loads(path.read_text())] == ["exa", "openweather"]
+def test_catalog_route_restrictions():
     bad = provider()
     bad["queries"][0]["url"] = "https://api.openweathermap.org/data/3.0/onecall"
     with pytest.raises(ValueError):

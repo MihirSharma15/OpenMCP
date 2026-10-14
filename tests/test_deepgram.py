@@ -17,7 +17,6 @@ from openmcp.integrations.deepgram.catalog import (
     SERVICES,
     provider,
 )
-from openmcp.integrations.deepgram.cli import write_catalog
 from openmcp.integrations.deepgram.protocol import parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -192,16 +191,7 @@ async def test_audio_fetch_errors_do_not_follow_redirects(status):
     assert len(calls) == 1
 
 
-def test_catalog_merge_and_fixed_route(tmp_path):
-    from openmcp.integrations.companies_house.catalog import provider as companies_house
-
-    path = tmp_path / "catalog.json"
-    path.write_text(json.dumps([companies_house()]))
-    write_catalog(path, "test")
-    assert [p["provider_id"] for p in json.loads(path.read_text())] == [
-        "companies-house",
-        "deepgram",
-    ]
+def test_catalog_route_restrictions():
     bad = provider()
     bad["queries"][0]["url"] = ORIGIN + "/v1/speak"
     with pytest.raises(ValueError):

@@ -7,13 +7,10 @@ from datetime import date
 
 from jsonschema import Draft202012Validator
 
+from ..transport import Rejected
 from .catalog import BALANCES, EVM_CHAINS, ORIGIN, SCREENER, SERVICES, TRANSACTIONS
 
 DEFAULT_CREDIT_COST_MICROUSD = 1000  # $10 / 10,000 purchased credits; included credits first.
-
-
-class Rejected(ValueError):
-    """Vendor explicitly confirmed a failed request deducted zero credits."""
 
 
 def validate_target(endpoint_id, url, mode):

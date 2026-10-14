@@ -1,4 +1,4 @@
-/** Account product contract. Keep aligned with docs/mvp-api-contract.json. */
+/** Account product contract. Keep aligned with docs/api-contract.json. */
 export type Page<T> = { items: T[]; next_cursor: string | null };
 export type Account = {
   account_id: string; status: string; currency: "usd_credits";

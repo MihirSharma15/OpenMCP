@@ -6,11 +6,8 @@ from decimal import Decimal, InvalidOperation
 
 from jsonschema import Draft202012Validator
 
+from ..transport import Rejected
 from .catalog import OVERVIEW, RELATED, SEARCH, SERVICES
-
-
-class Rejected(ValueError):
-    """The vendor explicitly rejected a task and reported zero cost."""
 
 
 def validate_target(endpoint_id, url, mode):

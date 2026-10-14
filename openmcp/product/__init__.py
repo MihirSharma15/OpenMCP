@@ -1,1 +1,1 @@
-"""Account-backed product. Kept separate from the local testnet demo."""
+"""Prepaid accounts, provider execution and the durable monetary ledger."""

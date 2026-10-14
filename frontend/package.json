@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname localhost",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run src && node --experimental-strip-types --test tests/*.test.ts"
+    "test": "vitest run src"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.0",

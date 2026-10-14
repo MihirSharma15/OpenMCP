@@ -11,7 +11,7 @@ from mcp.shared.memory import create_connected_server_and_client_session
 from openmcp.account_client import AccountClient, AccountSettings, configure_account
 from openmcp.account_mcp import create_account_mcp
 from openmcp.client_setup.installer import apply_plan, plan_install, server_entry, skill_text
-from openmcp.models import OpenMCPError
+from openmcp.errors import OpenMCPError
 
 TOKEN = "private-test-agent-credential"
 ROOT = Path(__file__).resolve().parents[1]

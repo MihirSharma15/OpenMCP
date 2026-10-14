@@ -1,8 +1,6 @@
-"""Explicit account configuration; never inherits the demo signer or catalog."""
+"""Account configuration and the shared published-service contract."""
 
 import ipaddress
-import json
-import logging
 import re
 from pathlib import Path
 from typing import Literal
@@ -15,7 +13,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _SECRET_REF = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
 _LOCALHOST_NAMES = {"localhost", "localhost.localdomain"}
-log = logging.getLogger(__name__)
 
 
 def validate_service_url(url, mode):
@@ -73,19 +70,7 @@ class Service(BaseModel):
     url: str
     recipient: str = ""
     settlement: Literal["mpp", "api_key"] = "mpp"
-    adapter: Literal[
-        "http",
-        "dataforseo",
-        "tavily",
-        "firecrawl",
-        "exa",
-        "openweather",
-        "companies_house",
-        "deepgram",
-        "builtwith",
-        "nansen",
-        "api2pdf",
-    ] = "http"
+    adapter: str = Field(default="http", pattern=r"^[a-z][a-z0-9_]{0,63}$")
     price_cents: int = Field(ge=2, le=1_000_000)
     input_schema: dict
     output_schema: dict = Field(default_factory=lambda: {"type": "object"})
@@ -101,66 +86,12 @@ class Service(BaseModel):
     @model_validator(mode="after")
     def validate_service(self):
         validate_service_url(self.url, self.mode)
-        if self.adapter == "dataforseo":
-            from openmcp.integrations.dataforseo.protocol import validate_target
+        from openmcp.integrations.registry import adapter
 
-            if self.settlement != "api_key":
-                raise ValueError("DataForSEO uses prepaid API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "tavily":
-            from openmcp.integrations.tavily.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Tavily uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "firecrawl":
-            from openmcp.integrations.firecrawl.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Firecrawl uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "exa":
-            from openmcp.integrations.exa.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Exa uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "openweather":
-            from openmcp.integrations.openweather.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("OpenWeather uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "companies_house":
-            from openmcp.integrations.companies_house.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Companies House uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "api2pdf":
-            from openmcp.integrations.api2pdf.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("API2PDF uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "nansen":
-            from openmcp.integrations.nansen.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Nansen uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "builtwith":
-            from openmcp.integrations.builtwith.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("BuiltWith uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
-        if self.adapter == "deepgram":
-            from openmcp.integrations.deepgram.protocol import validate_target
-
-            if self.settlement != "api_key":
-                raise ValueError("Deepgram uses API credentials, not MPP settlement")
-            validate_target(self.endpoint_id, self.url, self.mode)
+        if self.settlement == "api_key":
+            adapter(self.adapter).validate(self)
+        elif self.adapter != "http":
+            raise ValueError("MPP services use the http adapter")
         if self.settlement == "mpp":
             if not is_address(self.recipient):
                 raise ValueError("Invalid provider recipient")
@@ -182,20 +113,7 @@ class Service(BaseModel):
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
         }
-        if self.adapter in {
-            "dataforseo",
-            "tavily",
-            "firecrawl",
-            "exa",
-            "openweather",
-            "companies_house",
-            "deepgram",
-            "builtwith",
-            "nansen",
-            "api2pdf",
-        }:
-            # The wholesale charge varies with results and can be fractional cents.
-            # Do not advertise the legacy MPP split as an API-key vendor price quote.
+        if self.settlement == "api_key":
             result.pop("provider_price_cents")
             result.pop("platform_fee_cents")
         return result
@@ -244,7 +162,6 @@ class ProductSettings(BaseSettings):
     stripe_key: SecretStr = Field(default=SecretStr(""), alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: SecretStr = Field(default=SecretStr(""), alias="STRIPE_WEBHOOK_SECRET")
     stripe_api_version: str = Field(default="2025-02-24.acacia", alias="STRIPE_API_VERSION")
-    catalog_path: Path | None = Field(default=None, alias="OPENMCP_PRODUCT_CATALOG")
     rpc_url: str = Field(default="https://rpc.moderato.tempo.xyz", alias="OPENMCP_TREASURY_RPC_URL")
     chain_id: int = Field(default=42431, alias="OPENMCP_TREASURY_CHAIN_ID")
     token: str = Field(
@@ -262,54 +179,6 @@ class ProductSettings(BaseSettings):
     retry_seconds: int = Field(default=15, ge=1, le=300, alias="OPENMCP_PRODUCT_RETRY_SECONDS")
     max_attempts: int = Field(default=5, ge=1, le=20, alias="OPENMCP_PRODUCT_MAX_ATTEMPTS")
     top_up_presets_cents: tuple[int, ...] = (500, 1000, 2500, 5000)
-
-    def catalog(self):
-        """Operator catalog file. None means startup must leave stored rows alone."""
-        if self.catalog_path is None:
-            return None
-        try:
-            raw = self.catalog_path.read_text()
-        except FileNotFoundError:
-            log.warning(
-                "OPENMCP_PRODUCT_CATALOG file not found; continuing with an empty service catalog"
-            )
-            return []
-        items = json.loads(raw)
-        if not isinstance(items, list):
-            raise ValueError("Catalog must be a JSON array")
-        flat = bool(items) and all(
-            isinstance(item, dict) and "endpoint_id" in item and "queries" not in item
-            for item in items
-        )
-        if flat:
-            services = [Service.model_validate(item) for item in items]
-            providers = [
-                Provider(
-                    provider_id=service.endpoint_id,
-                    name=service.name,
-                    description=service.description,
-                    queries=[service],
-                )
-                for service in services
-            ]
-        else:
-            providers = [Provider.model_validate(item) for item in items]
-        provider_ids = [provider.provider_id for provider in providers]
-        endpoint_ids = [query.endpoint_id for provider in providers for query in provider.queries]
-        if len(set(provider_ids)) != len(provider_ids):
-            raise ValueError("Provider IDs must be unique")
-        if len(set(endpoint_ids)) != len(endpoint_ids):
-            raise ValueError("Service IDs must be unique")
-        return providers
-
-    def services(self):
-        providers = self.catalog() or []
-        return {
-            query.endpoint_id: query
-            for provider in providers
-            for query in provider.queries
-            if query.enabled and query.mode == self.mode
-        }
 
     def validate_startup(self, *, require_treasury_key=True):
         self.validate_database()
@@ -342,9 +211,6 @@ class ProductSettings(BaseSettings):
                 not self.treasury_key_file or not self.treasury_key_file.is_file()
             ):
                 raise ValueError("Live mode needs a private treasury key file")
-        # Providers are optional. A missing file logs an empty catalog, while
-        # malformed or unreadable files still report their configuration errors.
-        self.catalog()
 
     def validate_database(self):
         from openmcp.database import DatabaseManager

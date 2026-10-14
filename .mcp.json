@@ -2,7 +2,7 @@
   "mcpServers": {
     "openmcp": {
       "command": "uv",
-      "args": ["run", "--directory", "${CLAUDE_PROJECT_DIR:-.}", "openmcp", "mcp"]
+      "args": ["run", "--directory", "${CLAUDE_PROJECT_DIR:-.}", "openmcp", "mcp", "--mode", "account"]
     }
   }
 }

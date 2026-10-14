@@ -1,1 +1,1 @@
-"""OpenMCP demo: discover, pay, fetch, and settle."""
+"""OpenMCP: prepaid account discovery and API purchases."""

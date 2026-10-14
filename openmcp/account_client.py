@@ -15,7 +15,7 @@ import httpx
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .models import OpenMCPError
+from .errors import OpenMCPError
 
 IDENTIFIER = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -276,7 +276,9 @@ class AccountClient:
             or not isinstance(payload, dict)
         ):
             raise OpenMCPError(
-                "invalid_request", "Provide a payload and a price ceiling of 1–1,000,000 cents.", 422
+                "invalid_request",
+                "Provide a payload and a price ceiling of 1–1,000,000 cents.",
+                422,
             )
         body = {"endpoint_id": endpoint_id, "payload": payload, "max_price_cents": max_price_cents}
         self.journal.prepare(idempotency_key, body)

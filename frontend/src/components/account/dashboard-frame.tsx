@@ -68,12 +68,6 @@ export function DashboardFrame({
       icon: Code2,
       keywords: "integration mcp setup credentials",
     },
-    {
-      href: "/providers",
-      title: "Provider console",
-      icon: ArrowUpRight,
-      keywords: "api services earnings",
-    },
   ];
   const active = preview
     ? "Overview"

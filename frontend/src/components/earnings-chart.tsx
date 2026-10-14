@@ -7,24 +7,10 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { earningsSeries, isReceived, type Period } from "@/lib/providers";
-import { money } from "@/lib/demo";
-import type { ProviderTransaction } from "@/lib/openmcp";
+import { money } from "@/lib/account";
 
-export function EarningsChart({
-  transactions,
-  period,
-  now,
-  loaded,
-}: {
-  transactions: ProviderTransaction[];
-  period: Period;
-  now: number;
-  loaded: boolean;
-}) {
+export function EarningsChart({ series }: { series: { label: string; cents: number }[] }) {
   const reducedMotion = useReducedMotion();
-  const series = loaded ? earningsSeries(transactions, period, now) : [];
-  const hasPayments = transactions.some(isReceived);
   return (
     <div className="provider-chart">
       <div className="provider-chart-caption">
@@ -87,20 +73,7 @@ export function EarningsChart({
             />
           </BarChart>
         </ChartContainer>
-        {!hasPayments && (
-          <div className="provider-chart-empty">
-            <span>
-              {loaded
-                ? "Your next payment starts here"
-                : "Connecting to your earnings"}
-            </span>
-            <p>
-              {loaded
-                ? "Confirmed payments will appear automatically."
-                : "Reading your provider ledger…"}
-            </p>
-          </div>
-        )}
+
       </div>
     </div>
   );

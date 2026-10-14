@@ -5,6 +5,7 @@ replays that exact credential. An unconfirmed signed transaction blocks further
 signing because the treasury has one nonce stream.
 """
 
+import hashlib
 import json
 import os
 import stat
@@ -14,9 +15,12 @@ from eth_hash.auto import keccak
 from mpp import BodyDigest, Challenge, Receipt
 from mpp.methods.tempo import ChargeIntent, TempoAccount, tempo
 
-from ..payments import memo_for
 from .config import Service
 from .models import ProductError, canonical
+
+
+def memo_for(identifier):
+    return "0x" + hashlib.sha256(identifier.encode()).hexdigest()
 
 
 class TerminalFailure(Exception):

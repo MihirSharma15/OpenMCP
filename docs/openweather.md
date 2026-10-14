@@ -33,33 +33,21 @@ Sources reviewed October 7, 2026:
 
 ## Configuration and registration
 
-Set private `OPENWEATHER_API_KEY` in ignored local `.env` and separately on the
-worker host. `OPENWEATHER_REQUEST_COST_MICROUSD` defaults to `0` for the confirmed
-free tier. Override with a nonnegative integer no larger than 1,000,000 if needed.
-The integration does not check account quotas or automatically change plans.
-Both account modes contact the real vendor; neither is an upstream sandbox.
+Set `OPENWEATHER_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-After configuring the intended database, apply migrations and register:
+`OPENWEATHER_REQUEST_COST_MICROUSD` configures the per-request estimate (default 0 for the free collection). Both account modes call the real vendor.
+
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
 ```bash
-uv run python -m openmcp.product.cli migrate
-uv run openmcp openweather register
+uv run openmcp providers validate openweather
+uv run openmcp providers register openweather
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-If Supabase tracks migrations, apply the additive `20261007030000_openweather.sql`
-using your existing migration workflow instead. Earlier files are unchanged.
-Registration preserves other providers and makes no upstream requests.
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-For file-managed catalogs, merge into the full configured catalog:
-
-```bash
-uv run openmcp openweather catalog --output catalog/all-providers.json --mode test
-```
-
-The checked-in `catalog/openweather.json` contains only this provider. Do not
-replace the whole marketplace with it. For database-managed catalogs leave
-`OPENMCP_PRODUCT_CATALOG` unset on both the API and worker. Deploy the updated
-API and worker, configure secrets, migrate and register separately from local tests.
 
 ## Request and recovery boundaries
 

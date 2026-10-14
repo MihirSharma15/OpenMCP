@@ -7,7 +7,6 @@ import httpx
 import pytest
 
 from openmcp.integrations.api2pdf.catalog import MARKDOWN, URL, provider
-from openmcp.integrations.api2pdf.cli import write_catalog
 from openmcp.integrations.api2pdf.protocol import parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -34,7 +33,7 @@ def service():
     return Provider.model_validate(provider()).queries[0]
 
 
-def test_protocol_and_private_catalog(tmp_path):
+def test_protocol_and_private_catalog():
     outgoing, auth = prepare(MARKDOWN, URL, "live", PAYLOAD, SECRET)
     assert auth == SECRET and SECRET not in json.dumps(outgoing)
     assert outgoing["markdown"] == PAYLOAD["markdown"]
@@ -48,10 +47,6 @@ def test_protocol_and_private_catalog(tmp_path):
     assert URL not in json.dumps(public) and "secret_ref" not in public
     assert "provider_price_cents" not in public
     assert public["price_cents"] == 3
-    path = tmp_path / "catalog.json"
-    write_catalog(path, "live")
-    write_catalog(path, "live")
-    assert len(ProductSettings(_env_file=None, catalog_path=path).catalog()) == 1
 
 
 @pytest.mark.parametrize("mode", ["test", "live"])

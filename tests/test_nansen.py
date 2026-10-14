@@ -14,7 +14,6 @@ from openmcp.integrations.nansen.catalog import (
     TRANSACTIONS,
     provider,
 )
-from openmcp.integrations.nansen.cli import write_catalog
 from openmcp.integrations.nansen.protocol import Rejected, credit_rate, parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -257,13 +256,7 @@ def test_zero_cost_error_requires_explicit_evidence():
         assert not isinstance(exc.value, Rejected)
 
 
-def test_catalog_merge_and_target_bounds(tmp_path):
-    from openmcp.integrations.builtwith.catalog import provider as builtwith
-
-    path = tmp_path / "catalog.json"
-    path.write_text(json.dumps([builtwith()]))
-    write_catalog(path, "live")
-    assert [p["provider_id"] for p in json.loads(path.read_text())] == ["builtwith", "nansen"]
+def test_catalog_route_restrictions():
     for field, value in [
         ("url", ORIGIN + "/api/v1/smart-money/holdings"),
         ("url", ORIGIN + "/api/v1/token-screener?apikey=bad"),

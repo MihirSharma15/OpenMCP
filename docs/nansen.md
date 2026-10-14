@@ -38,23 +38,21 @@ Wallet-label fields and unknown vendor additions are excluded from normalized ou
 
 ## Setup
 
-Put `NANSEN_API_KEY` in the private worker environment. The catalog contains only the environment-variable name. No new library dependencies are required.
+Set `NANSEN_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-Apply `20261007070000_nansen.sql` with your privileged deployment migration process, together with any earlier unshipped adapter migrations. Do not edit already-run migrations or use the restricted runtime login for DDL. Then register against your target database with the correct product mode:
+`NANSEN_CREDIT_COST_MICROUSD` configures the replacement-cost estimate (default 1000). Both account modes call the real vendor.
 
-```sh
-uv run openmcp nansen register
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
+
+```bash
+uv run openmcp providers validate nansen
+uv run openmcp providers register nansen
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-Registration upserts Nansen without deleting other providers. Deploy the updated API and continuously running worker, including the worker key. Local catalog files do not automatically register providers in production Supabase.
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-For file-catalog configurations:
-
-```sh
-uv run openmcp nansen catalog --output catalog/nansen.json --mode test
-```
-
-Use `--mode live` for a live file catalog. The committed example uses account test mode; both account modes call the real Nansen API, not a vendor sandbox.
 
 ## Verification
 

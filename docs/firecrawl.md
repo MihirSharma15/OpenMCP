@@ -49,31 +49,18 @@ your actual contracted per-credit rate for another plan. Restart the worker afte
 changing it. This setting does not track remaining free credits or automatically
 detect plan changes. The integration never enables PAYG.
 
-Apply the additive migration with the privileged migration database URL, then
-install/restart the updated API and worker. For a database-managed catalog
-(`OPENMCP_PRODUCT_CATALOG` unset), register or update Firecrawl without deleting
-other providers:
+Follow [provider onboarding](providers.md) after applying account migrations:
 
 ```bash
-uv run python -m openmcp.product.cli migrate
-uv run openmcp firecrawl register
+uv run openmcp providers validate firecrawl
+uv run openmcp providers register firecrawl
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-For a file-managed catalog, merge into the **existing complete approved file**:
-
-```bash
-uv run openmcp firecrawl catalog --output catalog/your-existing-catalog.json --mode test
-```
-
-Use the same file and `OPENMCP_PRODUCT_MODE` on API and worker. Both account modes
-call real Firecrawl and consume vendor credits. The checked-in standalone
-`catalog/firecrawl.json` is an example; replacing a complete catalog with it
-would remove other providers during startup sync.
-
-The local operator migration command replays idempotent SQL in one transaction,
-validating only the latest adapter constraint to preserve newer catalog rows.
-Supabase applies the original migration files using its own tracking. Existing
-migration files were not edited.
+Registration is disabled by default, makes no vendor calls and preserves other providers.
+Both account modes call real Firecrawl and consume vendor credits. PostgreSQL is the
+runtime catalog; startup never imports local files.
 
 ## Request and recovery boundaries
 

@@ -1,13 +1,35 @@
-"""SQLite job checkpoints and immutable service registrations."""
+"""Local Creator checkpoints and a durable journal for generated-service calls."""
 
 import json
+import os
+import sqlite3
 import time
 import uuid
+from contextlib import contextmanager
 
-from openmcp.models import OpenMCPError
-from openmcp.store import Database
+from openmcp.errors import OpenMCPError
+from openmcp.product.models import fingerprint
 
 from .models import CreateRequest
+
+
+class Database:
+    def __init__(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.path = path
+        if not path.exists():
+            path.touch(mode=0o600)
+        os.chmod(path, 0o600)
+
+    @contextmanager
+    def connection(self):
+        db = sqlite3.connect(self.path, timeout=10)
+        db.row_factory = sqlite3.Row
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
 
 class CreatorStore(Database):
@@ -20,8 +42,9 @@ class CreatorStore(Database):
                     state TEXT NOT NULL, lease TEXT, lease_until REAL,
                     doc TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS creator_services (
-                    id TEXT PRIMARY KEY, job_id TEXT UNIQUE NOT NULL, doc TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS creator_calls (
+                    execution_id TEXT PRIMARY KEY, job_id TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL, data TEXT
                 );
             """)
 
@@ -146,25 +169,37 @@ class CreatorStore(Database):
             )
             return job
 
-    def publish(self, job, lease, provider):
-        job.update(state="ready", message="Validated service registered", endpoint_id=provider.id)
-        doc = provider.model_dump(mode="json")
+    def ready(self, job, lease):
+        self.save(
+            job, lease, "ready", "Sample validated; ready for explicit account-catalog publication"
+        )
+
+    def begin_call(self, job_id, execution_id, payload):
+        digest = fingerprint({"job_id": job_id, "payload": payload})
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
-            updated = db.execute(
-                "UPDATE creator_jobs SET state='ready',doc=? WHERE id=? AND lease=? AND lease_until>?",
-                (json.dumps(job), job["id"], lease, time.time()),
-            )
-            if updated.rowcount != 1:
-                raise RuntimeError("Creator lease lost")
+            row = db.execute(
+                "SELECT * FROM creator_calls WHERE execution_id=?", (execution_id,)
+            ).fetchone()
+            if row:
+                if row["fingerprint"] != digest:
+                    raise OpenMCPError(
+                        "idempotency_conflict", "This key belongs to a different request", 409
+                    )
+                if row["data"] is None:
+                    raise OpenMCPError(
+                        "call_pending", "An earlier call needs review; it was not repeated", 409
+                    )
+                return json.loads(row["data"])
             db.execute(
-                "INSERT INTO creator_services(id,job_id,doc) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET doc=excluded.doc",
-                (provider.id, job["id"], json.dumps(doc)),
+                "INSERT INTO creator_calls(execution_id,job_id,fingerprint) VALUES(?,?,?)",
+                (execution_id, job_id, digest),
             )
+        return None
 
-    def services(self):
+    def finish_call(self, execution_id, result):
         with self.connection() as db:
-            return [
-                json.loads(r[0])
-                for r in db.execute("SELECT doc FROM creator_services ORDER BY rowid")
-            ]
+            db.execute(
+                "UPDATE creator_calls SET data=? WHERE execution_id=? AND data IS NULL",
+                (json.dumps(result, allow_nan=False), execution_id),
+            )

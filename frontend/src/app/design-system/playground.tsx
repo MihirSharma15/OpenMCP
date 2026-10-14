@@ -38,29 +38,9 @@ import { AddMoneyDialog } from "@/components/account/top-up";
 import { TransactionTable, Empty } from "@/components/account/common";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { EarningsChart } from "@/components/earnings-chart";
-import type { ProviderTransaction } from "@/lib/openmcp";
 
-const previewNow = Date.UTC(2026, 9, 13, 18);
-const previewEarnings: ProviderTransaction[] = [
-  48, 126, 90, 216, 144, 306, 252,
-].map((cents, index) => ({
-  execution_id: `preview-${index}`,
-  session_id: "design-preview",
-  status: "completed",
-  endpoint_id: "preview",
-  provider: "Preview",
-  currency: "USD",
-  price_cents: cents,
-  platform_fee_cents: 0,
-  provider_amount_cents: cents,
-  agent_to_openmcp: null,
-  openmcp_to_provider: {
-    status: "success",
-    reference: `preview-receipt-${index}`,
-  },
-  error: null,
-  created_at: previewNow / 1000 - (6 - index) * 86400,
-  paid_at: previewNow / 1000 - (6 - index) * 86400,
+const previewEarnings = [48, 126, 90, 216, 144, 306, 252].map((cents, index) => ({
+  label: `Day ${index + 1}`, cents,
 }));
 
 export default function DesignSystem() {
@@ -298,24 +278,21 @@ export default function DesignSystem() {
           </div>
           <CardTitle>Earnings, in a little more detail.</CardTitle>
           <CardDescription>
-            The same chart used in the provider workspace. Focus it and use the
+            An illustrative chart using the shared components. Focus it and use the
             arrow keys to explore.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <EarningsChart
-            transactions={previewEarnings}
-            period="7"
-            now={previewNow}
-            loaded
+            series={previewEarnings}
           />
         </CardContent>
       </Card>
       <footer className="lab-footer">
         <span>Figtree + Geist Mono. Paper + ink + lavender.</span>
         <div>
-          <Link href="/providers">Provider workspace ↗</Link>
-          <Link href="/demo">Wallet observer ↗</Link>
+          <Link href="/dashboard">Account dashboard ↗</Link>
+          <Link href="/dashboard/agents">Agent allowances ↗</Link>
         </div>
       </footer>
       {dialog && (

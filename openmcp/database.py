@@ -167,15 +167,15 @@ class DatabaseManager:
                         raise RuntimeError(
                             "Supabase runtime must use a restricted application role"
                         )
-            if not row or row["version"] != 1:
-                raise RuntimeError("Account schema is incompatible; run account migrate")
+            if not row or row["version"] != 2:
+                raise RuntimeError("Account schema is incompatible; run openmcp migrate")
         except (
             psycopg.errors.UndefinedTable,
             psycopg.errors.UndefinedColumn,
             psycopg.errors.InvalidSchemaName,
         ):
             raise RuntimeError(
-                "Account schema is missing or incomplete; run account migrate"
+                "Account schema is missing or incomplete; run openmcp migrate"
             ) from None
 
     def close(self):

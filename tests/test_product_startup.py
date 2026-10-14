@@ -1,6 +1,5 @@
 """The live API can start without access to the worker's signing key."""
 
-import json
 from argparse import Namespace
 from unittest.mock import AsyncMock, Mock
 
@@ -14,25 +13,6 @@ from openmcp.product.config import ProductSettings
 
 @pytest.fixture
 def live_settings(tmp_path):
-    catalog = tmp_path / "services.json"
-    catalog.write_text(
-        json.dumps(
-            [
-                {
-                    "endpoint_id": "fixture",
-                    "name": "Fixture",
-                    "description": "Startup fixture",
-                    "url": "https://provider.example/execute",
-                    "recipient": "0x1111111111111111111111111111111111111111",
-                    "price_cents": 100,
-                    "input_schema": {"type": "object"},
-                    "enabled": True,
-                    "mode": "live",
-                    "supports_idempotency": True,
-                }
-            ]
-        )
-    )
     return ProductSettings(
         _env_file=None,
         mode="live",
@@ -48,7 +28,6 @@ def live_settings(tmp_path):
         rpc_url="https://rpc.tempo.xyz",
         explorer_url="https://explore.tempo.xyz",
         treasury_key_file=None,
-        catalog_path=catalog,
     )
 
 
@@ -67,6 +46,7 @@ def test_live_api_starts_without_signer_but_worker_requires_it(
     store.database.check_schema_version.assert_called_once()
     store.bind_runtime.assert_called_once_with(live_settings)
     store.close.assert_called_once()
+    store.sync_catalog.assert_not_called()
     with pytest.raises(ValueError, match="private treasury key file"):
         live_settings.validate_startup()
 
@@ -83,49 +63,25 @@ def test_api_still_requires_live_network(live_settings, change, message):
         settings.validate_startup(require_treasury_key=False)
 
 
-@pytest.mark.parametrize("catalog_state", ["unset", "empty", "missing"])
-def test_live_api_accepts_no_providers(live_settings, monkeypatch, catalog_state):
-    if catalog_state == "empty":
-        live_settings.catalog_path.write_text("[]")
-    elif catalog_state == "missing":
-        live_settings.catalog_path.unlink()
-    else:
-        live_settings.catalog_path = None
+@pytest.mark.parametrize("contents", [None, "[]", "not JSON"])
+def test_startup_never_reads_or_mutates_catalog_files(
+    live_settings, monkeypatch, tmp_path, contents
+):
+    catalog = tmp_path / "catalog.json"
+    if contents is not None:
+        catalog.write_text(contents)
+    monkeypatch.setenv("OPENMCP_PRODUCT_CATALOG", str(catalog))
     store = Mock()
     monkeypatch.setattr(app_module.DatabaseManager, "from_settings", Mock(return_value=Mock()))
     monkeypatch.setattr(app_module, "Store", Mock(return_value=store))
-    app = app_module.create_app(live_settings, verifier=AsyncMock(), stripe=AsyncMock())
-    with TestClient(app) as client:
+    with TestClient(
+        app_module.create_app(live_settings, verifier=AsyncMock(), stripe=AsyncMock())
+    ) as client:
         assert client.get("/health/live").status_code == 200
-    store.sync_catalog.assert_called_once_with(None if catalog_state == "unset" else [])
-
-
-def test_missing_catalog_returns_no_services_and_logs_warning(live_settings, tmp_path, caplog):
-    live_settings.catalog_path = tmp_path / "missing.json"
-    assert live_settings.services() == {}
-    assert any(
-        record.levelname == "WARNING" and "empty service catalog" in record.message
-        for record in caplog.records
-    )
-
-
-def test_invalid_catalog_is_not_silently_ignored(live_settings):
-    live_settings.catalog_path.write_text("not JSON")
-    with pytest.raises(json.JSONDecodeError):
-        live_settings.catalog()
-
-
-def test_catalog_permission_error_is_not_silently_ignored(live_settings, monkeypatch):
-    def denied(_):
-        raise PermissionError("Cannot read catalog")
-
-    monkeypatch.setattr(type(live_settings.catalog_path), "read_text", denied)
-    with pytest.raises(PermissionError):
-        live_settings.catalog()
+    store.sync_catalog.assert_not_called()
 
 
 async def test_worker_cli_starts_without_catalog_or_treasury(live_settings, monkeypatch):
-    live_settings.catalog_path = None
     store = Mock()
     store.requires_treasury.return_value = False
     stripe = Mock(close=AsyncMock())
@@ -144,12 +100,12 @@ async def test_worker_cli_starts_without_catalog_or_treasury(live_settings, monk
     worker.tick.assert_awaited_once()
     stripe.close.assert_awaited_once()
     store.close.assert_called_once()
+    store.sync_catalog.assert_not_called()
 
 
 async def test_worker_cli_requires_signer_for_mpp_even_without_catalog_file(
     live_settings, monkeypatch
 ):
-    live_settings.catalog_path = None
     store = Mock()
     store.requires_treasury.return_value = True
     stripe = Mock(close=AsyncMock())
@@ -159,3 +115,17 @@ async def test_worker_cli_requires_signer_for_mpp_even_without_catalog_file(
             Namespace(command="worker", once=True), live_settings, store
         )
     stripe.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("command", ["doctor", "review"])
+async def test_account_operator_inspection_needs_no_mpp_signer(live_settings, monkeypatch, command):
+    store = Mock()
+    store.review.return_value = []
+    store.service_count.return_value = 0
+    store.health.return_value = {"database": True, "worker": False}
+    monkeypatch.setattr(cli_module, "ProductSettings", Mock(return_value=live_settings))
+    monkeypatch.setattr(cli_module.DatabaseManager, "from_settings", Mock(return_value=Mock()))
+    monkeypatch.setattr(cli_module, "Store", Mock(return_value=store))
+    monkeypatch.setattr(cli_module, "Treasury", Mock(side_effect=AssertionError("No signer")))
+    await cli_module.run(Namespace(command=command, chain=False))
+    store.close.assert_called_once()

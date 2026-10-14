@@ -47,9 +47,8 @@ async def run(args):
             return
         # A worker with no MPP services or unfinished MPP payments can process
         # Stripe events without a signer. The database decides below.
-        settings.validate_startup(require_treasury_key=args.command != "worker")
+        settings.validate_startup(require_treasury_key=False)
         store.bind_runtime(settings)
-        store.sync_catalog(settings.catalog())
         await run_with_store(args, settings, store)
     finally:
         store.close()
@@ -83,7 +82,7 @@ async def run_with_store(args, settings, store):
     treasury = None
     worker = None
     try:
-        if args.command != "worker" or store.requires_treasury(settings.mode):
+        if store.requires_treasury(settings.mode):
             treasury = Treasury(settings, store)
         worker = Worker(settings, store, stripe, treasury)
         if args.command == "worker":
@@ -143,7 +142,7 @@ async def run_with_store(args, settings, store):
             await worker.api_caller.close()
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate")
@@ -161,7 +160,7 @@ def main():
         "--refund", action="store_true", help="Return credits only after payment outcome is known"
     )
     reconcile.add_argument("--reason")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Provider credential references are resolved from the worker environment.
     load_dotenv(".env")
     logging.basicConfig(level=logging.INFO)

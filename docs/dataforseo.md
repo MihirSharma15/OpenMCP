@@ -1,8 +1,7 @@
 # DataForSEO provider
 
 DataForSEO is integrated into **account mode** as one provider with three queries.
-The separate testnet demo still reads `catalog/providers.json`. The checked-in
-`catalog/dataforseo.json` selects free sandbox endpoints and marks results as demo data.
+Test-mode definitions use free sandbox endpoints and label sandbox results.
 
 | Endpoint ID | Input | Result | Initial OpenMCP retail price |
 | --- | --- | --- | --- |
@@ -66,61 +65,25 @@ another vendor request if the worker exits before capturing credits.
 
 ## Configure the provider
 
-Save `DATAFORSEO_AUTH` privately in the worker environment, or the ignored root
-`.env`: base64 of the API login and API password joined with `:`, without a `Basic `
-prefix. This is a credential, not encryption. Keep `.env` owner-readable only.
-The catalog stores the variable name `DATAFORSEO_AUTH`, never its value. The API,
-browser, and LLM do not need the vendor secret.
+Set `DATAFORSEO_AUTH` to base64 of `API login:API password`, without the `Basic`
+prefix, in the private worker environment. Complete vendor account verification.
+Do not put the credential in a catalog export or agent configuration.
 
-From the repository root:
+Apply the account migrations and follow [provider onboarding](providers.md):
 
 ```bash
-uv run openmcp dataforseo catalog --mode test --output catalog/dataforseo.json
-uv run openmcp dataforseo check
+uv run openmcp providers validate dataforseo
+uv run openmcp providers register dataforseo
+uv run openmcp providers check dataforseo
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-The check makes three free sandbox requests. Account verification must be complete;
-HTTP 403 with API status `40104` indicates pending email/phone verification. A completed
-verification can take time to become effective, as observed during initial setup.
-
-Set `OPENMCP_PRODUCT_CATALOG` to the generated catalog path in the **API and worker**,
-apply the migration, and restart both with their normal account configuration:
-
-```bash
-uv run python -m openmcp.product.cli migrate
-uv run python -m openmcp.product.cli database-check
-uv run openmcp serve --mode account
-uv run python -m openmcp.product.cli worker
-```
-
-Run the worker in a separate process. Clerk, Stripe, database, and account MCP
-configuration follow [account setup](account-mvp.md). The migration command requires
-a privileged database login; the runtime retains its restricted login.
-
-`catalog --output PATH` merges DataForSEO into an existing provider file and preserves
-the other providers. Use the deployment's existing approved catalog when one exists.
-On startup, OpenMCP replaces its database catalog with the entire configured file;
-pointing at a missing or incomplete file can remove other discoverable providers.
-
-For live deployment, generate a separate catalog:
-
-```bash
-uv run openmcp dataforseo catalog --mode live --output .openmcp/dataforseo/live-catalog.json
-```
-
-Deliver that catalog to both hosts at their configured path and set the vendor secret
-on the worker. Alternatively, sync the full approved provider list into PostgreSQL
-using `Store.sync_catalog` during an operator migration, then leave
-`OPENMCP_PRODUCT_CATALOG` unset on both hosts to preserve the database catalog.
-The repository's Vercel packaging excludes `catalog/` and `.openmcp/`; a local file
-path alone will not make the file available in a hosted deployment.
-
-The new migration adds `queries.adapter` and `executions.provider_cost_microusd`.
-It preserves the existing v1 schema contract for older deployments, so apply it
-before rolling out the new API and worker. New code checks that the added columns
-exist. Register/enable live DataForSEO services only after both processes are updated.
-Never point test credits at billable endpoints; the adapter enforces mode-specific
-hosts. A live deployment must use the existing live account settings and schema.
+Registration defaults to disabled and never calls the vendor. The separate check
+uses the free sandbox by default. `OPENMCP_PRODUCT_MODE` selects test or live
+registration; live definitions target billable production endpoints. Publishing
+preserves other providers. API and worker startup never synchronize a file catalog.
+Configure credentials on the worker and restart it when those credentials change.
 
 ## Costs and validation
 
@@ -138,7 +101,7 @@ Discovery does not label the legacy MPP 90/10 split as a DataForSEO wholesale qu
 Optional **billable** validation:
 
 ```bash
-uv run openmcp dataforseo check --live --max-cost-usd 0.10
+uv run openmcp providers check dataforseo --live --max-cost-usd 0.10
 ```
 
 This submits one small sample to each endpoint. At the prices verified during setup,
@@ -156,36 +119,9 @@ uv run pytest tests/test_dataforseo.py tests/test_product_api_call.py \
   tests/test_product_postgres.py tests/test_product_database.py -q
 ```
 
-## Official MCP server and documentation sources
+## Documentation sources
 
-The official server was built and exercised over MCP stdio at version **3.1.3**,
-revision [`1fc6d197f1141cca8d1a242e15804c5adc41916a`](https://github.com/dataforseo/mcp-server-typescript/tree/1fc6d197f1141cca8d1a242e15804c5adc41916a).
-Its current tools are `docs_index`, `docs_list_sections`, `docs_search`, and
-`api_request`. It does not expose separate named tools for every API endpoint.
-Its default request mode uses `.ai` paths; `noAiMode: true` selects the standard API.
-The inspected implementation targets the production API, so OpenMCP's sandbox
-checks call the sandbox REST API directly.
-
-To reproduce the upstream setup (skip cloning if already present):
-
-```bash
-git clone https://github.com/dataforseo/mcp-server-typescript .openmcp/dataforseo/mcp-server
-git -C .openmcp/dataforseo/mcp-server checkout 1fc6d197f1141cca8d1a242e15804c5adc41916a
-npm --prefix .openmcp/dataforseo/mcp-server ci --ignore-scripts --no-audit --no-fund
-npm --prefix .openmcp/dataforseo/mcp-server run build
-uv run openmcp dataforseo mcp-check
-uv run openmcp dataforseo mcp
-```
-
-`mcp-check` starts the server, lists its tools, fetches the three endpoint documents,
-and exits. `mcp` runs the official stdio server for an MCP client. The wrapper reads
-the private credential and passes only the needed login/password to that child.
-Use this for operator exploration; purchases in OpenMCP use the bounded REST adapter
-so that discovery, credits, receipts, and retries remain under OpenMCP's control.
-
-The upstream repository is Apache-2.0 licensed. Its checkout retains its license;
-no upstream source was copied into the Python adapter. The catalog descriptions
-are concise, newly written descriptions of the following documented APIs:
+The bounded REST adapter follows these vendor contracts:
 
 - [Google Organic Live Advanced](https://docs.dataforseo.com/v3/serp/google/organic/live/advanced/)
 - [Google Keyword Overview](https://docs.dataforseo.com/v3/dataforseo_labs/google/keyword_overview/live/)

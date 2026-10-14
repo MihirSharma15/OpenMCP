@@ -35,31 +35,21 @@ Sources reviewed October 7, 2026:
 
 ## Configuration and registration
 
-Set `EXA_API_KEY` in ignored root `.env` for local operation and separately in
-private worker deployment secrets. Both OpenMCP test/live account modes contact
-the real vendor and consume its balance; neither is an Exa sandbox.
+Set `EXA_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-Once `OPENMCP_PRODUCT_DATABASE_URL` is configured for the intended database:
+Both account modes call the real vendor and consume its balance.
 
-```bash
-uv run openmcp account migrate
-uv run openmcp exa register
-```
-
-Registration adds Exa without pruning other providers. Apply the additive
-`20261007020000_exa.sql` migration with your normal Supabase migration process
-instead if that manages deployments. Earlier migration files are unchanged.
-
-If using a file-backed catalog instead, merge into the **full** configured file:
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
 ```bash
-uv run openmcp exa catalog --output catalog/all-providers.json --mode test
+uv run openmcp providers validate exa
+uv run openmcp providers register exa
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-`catalog/exa.json` contains Exa alone: do not replace a populated marketplace
-catalog with it. Catalog generation and registration make no vendor requests.
-Deploy/restart the updated backend and worker after provisioning secrets and
-registering services. Local isolated test catalogs are not production registration.
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
+
 
 ## Billing and recovery
 

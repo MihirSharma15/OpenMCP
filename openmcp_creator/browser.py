@@ -1,8 +1,11 @@
 """Isolated Chromium contexts with bounded, address-checked HTTP access."""
 
-from urllib.parse import urlsplit
+import logging
+from urllib.parse import urljoin, urlsplit
 
 from .models import origin
+
+log = logging.getLogger(__name__)
 
 
 class Browser:
@@ -10,6 +13,7 @@ class Browser:
         self.settings, self.network, self.vault, self.job_id = settings, network, vault, job_id
         self.allowed_mutation_origin = None
         self.current = None
+        self.redirect_url = None
         self.playwright = self.browser = self.context = None
 
     async def __aenter__(self):
@@ -77,16 +81,56 @@ class Browser:
             cookies = response.headers.get_list("set-cookie")
             if cookies:
                 response_headers["set-cookie"] = "\n".join(cookies)
+            if response.is_redirect:
+                # Playwright does not intercept the next hop of a fulfilled HTTP
+                # redirect. Finish this document, then navigate through read(),
+                # so every hop uses the address-checked transport. Never replay
+                # a mutating request via a 307/308 or a redirected subresource.
+                if (
+                    not request.is_navigation_request()
+                    or request.frame != self.page.main_frame
+                    or (
+                        request.method not in {"GET", "HEAD"}
+                        and response.status_code not in {301, 302, 303}
+                    )
+                ):
+                    raise ValueError("Unsupported browser redirect")
+                target = urljoin(request.url, response.headers["location"])
+                await self.network.address(target)
+                if origin(target) != scope and (
+                    request.method not in {"GET", "HEAD"}
+                    or headers.get("cookie")
+                    or headers.get("authorization")
+                ):
+                    raise ValueError("Authenticated requests cannot redirect to another origin")
+                self.redirect_url = target
+                await route.fulfill(
+                    status=200,
+                    headers={
+                        "content-type": "text/html",
+                        **({"set-cookie": response_headers["set-cookie"]} if cookies else {}),
+                    },
+                    body="<html><body></body></html>",
+                )
+                return
             await route.fulfill(
                 status=response.status_code, headers=response_headers, body=response.content
             )
-        except Exception:
+        except Exception as exc:
+            log.warning("Creator browser request blocked error=%s", type(exc).__name__)
             await route.abort()
 
     async def read(self, url, selector="body"):
         await self.network.address(url)
         if self.page.url != url:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        for _ in range(6):
+            if self.redirect_url is None:
+                break
+            target, self.redirect_url = self.redirect_url, None
+            await self.page.goto(target, wait_until="domcontentloaded", timeout=30000)
+        else:
+            raise ValueError("Too many browser redirects")
         self.current = self.page.url
         text = await self.page.locator(selector).first.inner_text()
         links = await self.page.locator("a[href]").evaluate_all(

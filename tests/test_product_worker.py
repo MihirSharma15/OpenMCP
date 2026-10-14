@@ -140,9 +140,9 @@ async def test_api_key_error_after_sent_does_not_retry_post():
     store = Mock()
     store.execution_internal.return_value = {**row, "payment_status": "sent"}
     caller = Mock(purchase=AsyncMock(side_effect=RuntimeError("socket")))
-    await Worker(ProductSettings(_env_file=None, max_attempts=5), store, Mock(), Mock(), caller).execution(
-        row, Mock()
-    )
+    await Worker(
+        ProductSettings(_env_file=None, max_attempts=5), store, Mock(), Mock(), caller
+    ).execution(row, Mock())
     caller.purchase.assert_awaited_once()
     store.retry_execution.assert_not_called()
     store.finish.assert_not_called()

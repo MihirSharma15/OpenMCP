@@ -1,17 +1,20 @@
+"""Single-operator Creator research and authenticated generated-service hosting."""
+
 import asyncio
 import hmac
-from contextlib import AsyncExitStack, asynccontextmanager, suppress
+import json
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from jsonschema import Draft202012Validator
 from pydantic import Field
 
-from openmcp.config import Settings
-from openmcp.models import OpenMCPError
+from openmcp.errors import OpenMCPError
 
-from .adapter import AdapterRuntime
+from .adapter import AdapterRuntime, input_schema
 from .inference import Inference
-from .models import CreateRequest, StrictModel
+from .models import Adapter, CreateRequest, StrictModel
 from .network import PublicHTTP
 from .settings import CreatorSettings
 from .store import CreatorStore
@@ -33,45 +36,66 @@ def public_job(job):
     }
 
 
-def create_app(settings=None, creator_settings=None, *, start_worker=True):
-    settings, creator_settings = settings or Settings(), creator_settings or CreatorSettings()
-    if len(settings.api_token.get_secret_value()) < 16:
-        raise ValueError("Initialize the OpenMCP connection token")
-    store = CreatorStore(settings.creator_database)
-    vault = Vault(settings.creator_database.parent / "creator")
-    network = PublicHTTP(allow_loopback=creator_settings.allow_loopback)
-    inference = Inference(creator_settings)
-    runtime = AdapterRuntime(settings, creator_settings, network, vault)
-    worker = Worker(store, settings, creator_settings, inference, network, vault, runtime)
-    services, lock = {}, asyncio.Lock()
+def create_app(settings=None, *, start_worker=True, store=None, runtime=None):
+    settings = settings or CreatorSettings()
+    if (
+        min(
+            len(settings.admin_token.get_secret_value()), len(settings.api_token.get_secret_value())
+        )
+        < 16
+    ):
+        raise ValueError(
+            "Configure separate Creator admin and service tokens (at least 16 characters)"
+        )
+    if settings.admin_token.get_secret_value() == settings.api_token.get_secret_value():
+        raise ValueError("Creator admin and service tokens must differ")
+    store = store or CreatorStore(settings.database)
+    owns_network = runtime is None
+    network = (
+        PublicHTTP(allow_loopback=settings.allow_loopback) if owns_network else runtime.network
+    )
+    vault = Vault(settings.state_dir) if runtime is None else runtime.vault
+    runtime = runtime or AdapterRuntime(settings, network, vault)
+    inference = Inference(settings)
+    worker = Worker(store, settings, inference, network, vault, runtime)
 
     @asynccontextmanager
     async def lifespan(app):
-        async with AsyncExitStack() as stack:
-            app.state.stack = stack
-            stack.push_async_callback(network.close)
-            stack.push_async_callback(inference.close)
-            task = asyncio.create_task(worker.run()) if start_worker else None
-            try:
-                yield
-            finally:
-                if task:
-                    task.cancel()
-                    with suppress(asyncio.CancelledError):
-                        await task
+        task = asyncio.create_task(worker.run()) if start_worker else None
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            await inference.close()
+            if owns_network:
+                await network.close()
 
     app = FastAPI(title="OpenMCP API Creator", lifespan=lifespan)
     app.state.store, app.state.worker, app.state.runtime = store, worker, runtime
 
     @app.middleware("http")
-    async def authorize(request: Request, call_next):
-        if request.url.path.startswith("/jobs"):
-            expected = "Bearer " + settings.api_token.get_secret_value()
-            if not hmac.compare_digest(
-                request.headers.get("Authorization", "").encode(), expected.encode()
-            ):
-                return JSONResponse({"error": "unauthorized"}, status_code=401)
-        return await call_next(request)
+    async def authorize(request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
+        token = settings.admin_token if request.url.path.startswith("/jobs") else settings.api_token
+        expected = "Bearer " + token.get_secret_value()
+        if not hmac.compare_digest(
+            request.headers.get("Authorization", "").encode(), expected.encode()
+        ):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > 131_072:
+                return JSONResponse({"error": "request_too_large"}, status_code=413)
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.exception_handler(OpenMCPError)
     async def error(request, exc):
@@ -79,12 +103,10 @@ def create_app(settings=None, creator_settings=None, *, start_worker=True):
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "services": len(store.services())}
+        return {"status": "ok"}
 
     @app.post("/jobs", status_code=202)
     async def submit(body: CreateRequest):
-        if body.wallet not in settings.addresses():
-            raise OpenMCPError("invalid_wallet", "Unknown receiving wallet", 422)
         return public_job(store.submit(body))
 
     @app.get("/jobs")
@@ -110,25 +132,29 @@ def create_app(settings=None, creator_settings=None, *, start_worker=True):
     async def execute(endpoint_id: str, request: Request):
         job = store.get(endpoint_id)
         if job["state"] != "ready":
-            raise OpenMCPError("not_ready", "Service has not passed validation", 404)
-        async with lock:
-            if endpoint_id not in services:
-                service, _ = runtime.build(job)
-                await app.state.stack.enter_async_context(service.router.lifespan_context(service))
-                services[endpoint_id] = service
-        # Preserve original request bytes, payment headers and response headers.
-        import httpx
-        from fastapi import Response
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=services[endpoint_id]),
-            base_url=creator_settings.base_url,
-        ) as client:
-            response = await client.post(
-                f"/{endpoint_id}", content=await request.body(), headers=dict(request.headers)
-            )
-        return Response(
-            response.content, status_code=response.status_code, headers=dict(response.headers)
-        )
+            raise OpenMCPError("not_ready", "Service has not passed validation", 409)
+        key = request.headers.get("Idempotency-Key", "")
+        if not 1 <= len(key) <= 200 or any(not 33 <= ord(c) <= 126 for c in key):
+            raise OpenMCPError("invalid_key", "Supply an Idempotency-Key", 422)
+        spec = Adapter.model_validate(job["adapter"])
+        try:
+            payload = await request.json()
+        except ValueError:
+            raise OpenMCPError("invalid_payload", "JSON input required", 422) from None
+        if next(Draft202012Validator(input_schema(spec)).iter_errors(payload), None):
+            raise OpenMCPError("invalid_payload", "Input does not match service schema", 422)
+        previous = store.begin_call(endpoint_id, key, payload)
+        if previous is not None:
+            return previous
+        try:
+            data = await runtime.invoke(job, spec, payload)
+            if len(json.dumps(data, allow_nan=False).encode()) > 1_000_000:
+                raise ValueError("Response too large")
+            store.finish_call(key, data)
+        except Exception:
+            raise OpenMCPError(
+                "call_pending", "Source call needs review; reuse this key", 503
+            ) from None
+        return data
 
     return app

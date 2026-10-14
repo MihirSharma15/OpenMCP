@@ -16,7 +16,6 @@ from openmcp.integrations.companies_house.catalog import (
     SERVICES,
     provider,
 )
-from openmcp.integrations.companies_house.cli import write_catalog
 from openmcp.integrations.companies_house.protocol import parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -159,16 +158,7 @@ def test_profile_must_match_requested_company():
         parse(PROFILE, payload, body)
 
 
-def test_catalog_merge_and_route_settlement_restrictions(tmp_path):
-    from openmcp.integrations.openweather.catalog import provider as weather
-
-    path = tmp_path / "catalog.json"
-    path.write_text(json.dumps([weather()]))
-    write_catalog(path, "test")
-    assert [p["provider_id"] for p in json.loads(path.read_text())] == [
-        "openweather",
-        "companies-house",
-    ]
+def test_catalog_route_restrictions():
     for field, value in [
         ("url", ORIGIN + "/company/{company_number}/charges"),
         ("url", ORIGIN + "/search/companies?apikey=bad"),

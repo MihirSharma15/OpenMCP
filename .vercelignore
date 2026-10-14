@@ -5,7 +5,6 @@
 !vercel.json
 !README.md
 !openmcp
-!openmcp_provider
 !openmcp_creator
 !supabase
 supabase/.temp

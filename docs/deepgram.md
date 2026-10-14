@@ -106,32 +106,17 @@ worker setting; long-running or uncertain requests follow existing review policy
 
 ## Migration and catalog registration
 
-Deploy `supabase/migrations/20261007050000_deepgram.sql` through your existing
-privileged migration process. It extends the adapter constraint without rewriting
-older migrations. Restricted runtime credentials cannot run DDL. For isolated
-local development using your configured schema:
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
 ```bash
-uv run python -m openmcp.product.cli migrate
-uv run openmcp deepgram register
+uv run openmcp providers validate deepgram
+uv run openmcp providers register deepgram
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-Registration upserts this provider without deleting others, targeting configured
-database, schema and mode. Local registration does not populate production.
-Database-managed API and worker deployments must leave `OPENMCP_PRODUCT_CATALOG`
-unset. Redeploy updated API and worker code and configure the worker's key and
-trusted audio hosts separately. This provider does not require an MPP signer.
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-For a file-managed catalog, merge into the full approved catalog instead:
-
-```bash
-uv run openmcp deepgram catalog --output catalog/providers.json --mode live
-```
-
-`catalog/deepgram.json` is an isolated test-mode definition, not a replacement
-for the full production marketplace. Existing agent instructions can continue to
-use discover/execute and the returned schemas; audio-host setup belongs to the
-operator, not the agent.
 
 ## Billing and recovery boundaries
 

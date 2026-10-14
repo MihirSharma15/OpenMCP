@@ -66,7 +66,7 @@ class Store:
                 (address.lower(),),
             )
 
-    def sync_catalog(self, providers, *, prune=True):
+    def sync_catalog(self, providers, *, prune=False):
         if providers is None:
             return
         with self.connection() as c:
@@ -88,15 +88,8 @@ class Store:
                 )
             for provider in providers:
                 for query in provider.queries:
-                    if not prune:
-                        owner = c.execute(
-                            "SELECT provider_id FROM queries WHERE endpoint_id=%s",
-                            (query.endpoint_id,),
-                        ).fetchone()
-                        if owner and owner["provider_id"] != provider.provider_id:
-                            raise ValueError("Another provider owns this endpoint ID")
                     endpoint_ids.append(query.endpoint_id)
-                    c.execute(
+                    saved = c.execute(
                         "INSERT INTO queries(endpoint_id,provider_id,name,description,price_cents,"
                         "input_schema,output_schema,url,recipient,enabled,mode,keywords,"
                         "supports_idempotency,settlement,adapter) "
@@ -108,7 +101,8 @@ class Store:
                         "url=EXCLUDED.url, recipient=EXCLUDED.recipient, enabled=EXCLUDED.enabled, "
                         "mode=EXCLUDED.mode, keywords=EXCLUDED.keywords, "
                         "supports_idempotency=EXCLUDED.supports_idempotency, "
-                        "settlement=EXCLUDED.settlement, adapter=EXCLUDED.adapter",
+                        "settlement=EXCLUDED.settlement, adapter=EXCLUDED.adapter "
+                        "WHERE queries.provider_id=EXCLUDED.provider_id OR %s RETURNING endpoint_id",
                         (
                             query.endpoint_id,
                             provider.provider_id,
@@ -125,8 +119,11 @@ class Store:
                             query.supports_idempotency,
                             query.settlement,
                             query.adapter,
+                            prune,
                         ),
-                    )
+                    ).fetchone()
+                    if not saved:
+                        raise ValueError("Another provider owns this endpoint ID")
             if prune:
                 self._delete_missing(c, "queries", "endpoint_id", endpoint_ids)
                 self._delete_missing(c, "providers", "provider_id", provider_ids)
@@ -717,8 +714,8 @@ class Store:
         with self.connection() as c:
             c.execute(
                 "UPDATE executions SET payment_status='confirmed',provider_receipt=%s,"
-                "provider_cost_microusd=COALESCE(%s,provider_price_cents*10000),"
-                "provider_cost_cents=CASE WHEN %s::bigint IS NULL THEN provider_price_cents "
+                "provider_cost_microusd=COALESCE(%s,CASE WHEN COALESCE(service->>'settlement','mpp')='mpp' THEN provider_price_cents*10000 END),"
+                "provider_cost_cents=CASE WHEN %s::bigint IS NULL THEN CASE WHEN COALESCE(service->>'settlement','mpp')='mpp' THEN provider_price_cents END "
                 "ELSE ceil(%s::numeric/10000)::bigint END,"
                 "data=COALESCE(%s,data),status='fulfillment_pending',updated_at=now() "
                 "WHERE execution_id=%s AND status IN ('reserved','payment_pending','fulfillment_pending','needs_review')",
@@ -1020,6 +1017,41 @@ class Store:
                 "adapter": row["adapter"],
             }
         )
+
+    def catalog(self):
+        """Operator export, including disabled services and secret references (never secrets)."""
+        with self.connection() as c:
+            providers = c.execute("SELECT * FROM providers ORDER BY provider_id").fetchall()
+            queries = c.execute("SELECT * FROM queries ORDER BY endpoint_id").fetchall()
+            disabled = {
+                row["endpoint_id"]
+                for row in c.execute("SELECT endpoint_id FROM disabled_services").fetchall()
+            }
+        for query in queries:
+            if query["endpoint_id"] in disabled:
+                query["enabled"] = False
+        return [
+            dict(p)
+            | {
+                "queries": [
+                    self._as_service(q).model_dump()
+                    for q in queries
+                    if q["provider_id"] == p["provider_id"]
+                ]
+            }
+            for p in providers
+        ]
+
+    def set_service_enabled(self, endpoint_id, enabled, mode):
+        with self.connection() as c:
+            row = c.execute(
+                "UPDATE queries SET enabled=%s WHERE endpoint_id=%s AND mode=%s RETURNING endpoint_id",
+                (enabled, endpoint_id, mode),
+            ).fetchone()
+            if not row:
+                raise ProductError("not_found", "Service not found in this deployment.", 404)
+            if enabled:
+                c.execute("DELETE FROM disabled_services WHERE endpoint_id=%s", (endpoint_id,))
 
     def provider_secret_ref(self, endpoint_id):
         """Environment variable name for an API-key query. Never the key itself."""

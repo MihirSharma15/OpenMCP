@@ -8,6 +8,14 @@ class CreatorSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="OPENMCP_CREATOR_", extra="ignore"
     )
+    state_dir: Path = Path(".openmcp/creator")
+    admin_token: SecretStr = SecretStr("")
+    api_token: SecretStr = SecretStr("")
+
+    @property
+    def database(self):
+        return self.state_dir / "jobs.sqlite3"
+
     base_url: str = "http://127.0.0.1:9002"
     inference_base_url: str = "https://api.openai.com/v1"
     inference_api_key: SecretStr = SecretStr("")

@@ -25,8 +25,6 @@ from openmcp.cli import check_mcp
             3,
         ),
         ("account", {"providers": [], "discovery_is_free": True}, 0),
-        ("demo", {"endpoints": [{"endpoint_id": "a"}, {"endpoint_id": "b"}]}, 2),
-        ("demo", {"endpoints": []}, 0),
     ],
 )
 async def test_check_mcp_counts_discovery_results_without_purchasing(
@@ -43,12 +41,12 @@ async def test_check_mcp_counts_discovery_results_without_purchasing(
 
         @server.tool()
         async def balance() -> dict[str, Any]:
-            return {{"available_cents": 1000, "agent": {{}}, "address": "demo-wallet"}}
+            return {{"available_cents": 1000, "agent": {{}}}}
 
         @server.tool()
         async def discover(query: str, budget_cents: int) -> dict[str, Any]:
-            assert query == {('services' if mode == 'account' else 'FreightFlow due diligence')!r}
-            assert budget_cents == {0 if mode == 'account' else 1500}
+            assert query == "services"
+            assert budget_cents == 0
             return {discovery!r}
 
         server.run(transport="stdio")
@@ -69,8 +67,5 @@ async def test_check_mcp_counts_discovery_results_without_purchasing(
     assert summary["mode"] == mode
     assert summary["discovered_endpoints"] == count
     assert summary["spent_by_check_cents"] == 0
-    if mode == "account":
-        assert summary["available_cents"] == 1000
-        assert summary["agent"] == {}
-    else:
-        assert summary["agent_wallet"] == "demo-wallet"
+    assert summary["available_cents"] == 1000
+    assert summary["agent"] == {}

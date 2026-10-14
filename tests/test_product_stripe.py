@@ -21,25 +21,6 @@ from openmcp.product.stripe import StripeGateway
 def test_startup_accepts_server_keys_and_rejects_public_or_wrong_mode(mode, kind, tmp_path):
     signer = tmp_path / "signer.json"
     signer.write_text("{}")  # Startup checks presence; no signing occurs in this test.
-    catalog = tmp_path / "services.json"
-    catalog.write_text(
-        json.dumps(
-            [
-                {
-                    "endpoint_id": "fixture",
-                    "name": "Fixture",
-                    "description": "Configuration fixture",
-                    "url": "https://provider.example/execute",
-                    "recipient": "0x1111111111111111111111111111111111111111",
-                    "price_cents": 100,
-                    "input_schema": {"type": "object"},
-                    "enabled": True,
-                    "mode": mode,
-                    "supports_idempotency": True,
-                }
-            ]
-        )
-    )
     settings = ProductSettings(
         _env_file=None,
         mode=mode,
@@ -55,7 +36,6 @@ def test_startup_accepts_server_keys_and_rejects_public_or_wrong_mode(mode, kind
         rpc_url="https://rpc.tempo.xyz",
         explorer_url="https://explore.tempo.xyz",
         treasury_key_file=signer,
-        catalog_path=catalog,
     )
     settings.validate_startup()
     other_mode = "live" if mode == "test" else "test"

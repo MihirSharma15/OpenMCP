@@ -31,8 +31,7 @@ class StrictModel(BaseModel):
 class CreateRequest(StrictModel):
     url: str = Field(max_length=2000)
     goal: str = Field(default="Expose useful data from this source", max_length=4000)
-    price_cents: int = Field(ge=1, le=100000, strict=True)
-    wallet: str = Field(default="openmcp", pattern=r"^[a-z0-9-]+$")
+    price_cents: int = Field(ge=2, le=100000, strict=True)
     allowed_origins: list[str] = Field(default_factory=list, max_length=20)
     max_steps: int = Field(default=20, ge=1, le=100)
     idempotency_key: str = Field(min_length=8, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
@@ -82,8 +81,8 @@ class Credential(StrictModel):
 
 
 class Adapter(StrictModel):
-    name: str = Field(min_length=1, max_length=120)
-    description: str = Field(min_length=1, max_length=2000)
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=1000)
     keywords: list[str] = Field(min_length=1, max_length=30)
     kind: Literal["http_json", "web_text"]
     url: str = Field(max_length=2000)

@@ -5,8 +5,6 @@ import uuid
 
 import uvicorn
 
-from openmcp.config import Settings
-
 from .app import create_app, public_job
 from .models import CreateRequest, origin
 from .settings import CreatorSettings
@@ -23,10 +21,14 @@ def main(argv=None):
     create.add_argument("url")
     create.add_argument("--goal", default="Expose useful data from this source")
     create.add_argument("--price-cents", type=int, required=True)
-    create.add_argument("--wallet", default="openmcp")
     create.add_argument("--allow-origin", action="append", default=[])
     create.add_argument("--key", default=None)
     create.add_argument("--max-steps", type=int, default=20)
+    publish = commands.add_parser(
+        "publish", help="Publish a validated job into the account catalog"
+    )
+    publish.add_argument("job_id")
+    publish.add_argument("--enable", action="store_true", help="Enable purchases immediately")
     status = commands.add_parser("status", help="Inspect jobs and pending signup actions")
     status.add_argument("job_id", nargs="?")
     resume = commands.add_parser("resume", help="Resume after credentials or account setup")
@@ -45,31 +47,39 @@ def main(argv=None):
     secret.add_argument("name")
     secret.add_argument("--origin", required=True)
     args = parser.parse_args(argv)
-    settings, creator_settings = Settings(), CreatorSettings()
-    store = CreatorStore(settings.creator_database)
+    creator_settings = CreatorSettings()
+    store = CreatorStore(creator_settings.database)
     if args.command == "serve":
-        from urllib.parse import urlsplit
-
-        if (urlsplit(creator_settings.base_url).port or 80) != args.port:
-            parser.error("--port must match OPENMCP_CREATOR_BASE_URL")
-        uvicorn.run(
-            create_app(settings, creator_settings), host="127.0.0.1", port=args.port, workers=1
-        )
+        uvicorn.run(create_app(creator_settings), host="127.0.0.1", port=args.port, workers=1)
         return
     if args.command == "create":
-        if args.wallet not in settings.addresses():
-            parser.error("Unknown receiving wallet")
         result = store.submit(
             CreateRequest(
                 url=args.url,
                 goal=args.goal,
                 price_cents=args.price_cents,
-                wallet=args.wallet,
                 allowed_origins=args.allow_origin,
                 idempotency_key=args.key or uuid.uuid4().hex,
                 max_steps=args.max_steps,
             )
         )
+    elif args.command == "publish":
+        from openmcp.product.config import ProductSettings
+        from openmcp.providers import open_store, publish
+
+        from .adapter import provider_definition
+
+        product = ProductSettings()
+        definition = provider_definition(store.get(args.job_id), creator_settings, product.mode)
+        catalog = open_store(product)
+        try:
+            publish(catalog, [definition], product.mode, enable=args.enable)
+        finally:
+            catalog.close()
+        print(
+            json.dumps({"endpoint_id": args.job_id, "enabled": args.enable, "mode": product.mode})
+        )
+        return
     elif args.command == "status":
         result = store.get(args.job_id) if args.job_id else None
         if result is None:
@@ -95,9 +105,7 @@ def main(argv=None):
         value = getpass.getpass("Credential (hidden): ")
         if not value:
             parser.error("Credential cannot be empty")
-        Vault(settings.creator_database.parent / "creator").put(
-            args.job_id, args.name, value, args.origin
-        )
+        Vault(creator_settings.state_dir).put(args.job_id, args.name, value, args.origin)
         print("Credential saved. Resume the job when account setup is complete.")
         return
     print(json.dumps(public_job(result), indent=2))

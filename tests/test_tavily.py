@@ -16,7 +16,6 @@ from openmcp.integrations.tavily.catalog import (
     URL,
     provider,
 )
-from openmcp.integrations.tavily.cli import write_catalog
 from openmcp.integrations.tavily.protocol import credit_rate, parse, prepare
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
@@ -117,18 +116,6 @@ def test_free_and_paid_cash_cost_are_separate_from_credits():
 def test_ambiguous_or_malformed_result_not_captured(updates):
     with pytest.raises(ValueError):
         parse(PAYLOAD, envelope() | updates, 0)
-
-
-def test_catalog_merge_preserves_other_providers(tmp_path):
-    from openmcp.integrations.dataforseo.catalog import provider as dfs_provider
-
-    path = tmp_path / "approved.json"
-    path.write_text(json.dumps([dfs_provider()]))
-    write_catalog(path, "test")
-    write_catalog(path, "test")
-    entries = json.loads(path.read_text())
-    assert [p["provider_id"] for p in entries] == ["dataforseo", "tavily"]
-    assert SECRET not in path.read_text()
 
 
 @pytest.mark.parametrize(

@@ -16,7 +16,6 @@ from openmcp.client_setup.installer import (
     server_entry,
     skill_text,
 )
-from openmcp.wallets import create_wallets
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -200,10 +199,16 @@ def test_cli_dry_run_needs_no_wallet_and_writes_no_files(tmp_path):
 async def test_generated_launch_connects_over_stdio_from_an_unrelated_project(tmp_path):
     runtime = tmp_path / "runtime with spaces"
     runtime.mkdir()
-    create_wallets(runtime / ".openmcp/wallets")
-    (runtime / "catalog").mkdir()
-    (runtime / "catalog/providers.json").write_text((ROOT / "catalog/providers.json").read_text())
-    (runtime / ".env").write_text("OPENMCP_API_TOKEN=isolated-test-token\n")
+    from openmcp.account_client import AccountSettings, configure_account
+
+    configure_account(
+        AccountSettings(_env_file=None, state=runtime / ".openmcp/account"),
+        "https://api.example",
+        "omcp_" + "a" * 48,
+    )
+    (runtime / ".env").write_text(
+        "OPENMCP_ACCOUNT_STATE=" + str(runtime / ".openmcp/account") + "\n"
+    )
     project = tmp_path / "unrelated-project"
     project.mkdir()
     entry = server_entry(runtime)
@@ -216,10 +221,15 @@ async def test_generated_launch_connects_over_stdio_from_an_unrelated_project(tm
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             initialized = await session.initialize()
-            assert "explicit total user budget" in initialized.instructions
+            assert "prepaid USD credits" in initialized.instructions
             listed = await session.list_tools()
-            assert {tool.name for tool in listed.tools} == {"balance", "discover", "execute"}
-    assert (runtime / ".openmcp/agent-payments.sqlite3").exists()
+            assert {tool.name for tool in listed.tools} == {
+                "balance",
+                "discover",
+                "execute",
+                "execution_status",
+            }
+    assert (runtime / ".openmcp/account").exists()
     assert not (project / ".openmcp").exists()
 
 

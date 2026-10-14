@@ -8,7 +8,6 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from openmcp.config import Settings
 from openmcp.database import DatabaseManager, LeaseLost
 from openmcp.product.app import create_app
 from openmcp.product.config import ProductSettings
@@ -125,12 +124,6 @@ def test_api_factory_uses_runtime_role_without_migrations_and_closes_pool(
     with TestClient(app):
         assert app.state.store.bootstrap("factory-account")["balance_cents"] == 0
     assert app.state.store.database._pool.closed
-
-
-def test_product_url_does_not_configure_legacy_database(monkeypatch):
-    monkeypatch.setenv("OPENMCP_PRODUCT_DATABASE_URL", "postgresql://product.invalid/db")
-    monkeypatch.delenv("OPENMCP_LEGACY_DATABASE_URL", raising=False)
-    assert Settings(_env_file=None).product_database_url == ""
 
 
 @pytest.mark.parametrize(

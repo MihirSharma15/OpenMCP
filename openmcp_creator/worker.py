@@ -10,7 +10,6 @@ class Worker:
         self,
         store,
         settings,
-        creator_settings,
         inference,
         network,
         vault,
@@ -18,17 +17,17 @@ class Worker:
         *,
         browser_factory=Browser,
     ):
-        self.store, self.settings, self.creator_settings = store, settings, creator_settings
+        self.store, self.settings = store, settings
         self.inference, self.network, self.vault, self.runtime = inference, network, vault, runtime
         self.browser_factory = browser_factory
 
     async def run_once(self):
-        claimed = self.store.claim(self.creator_settings.job_timeout_seconds + 60)
+        claimed = self.store.claim(self.settings.job_timeout_seconds + 60)
         if claimed is None:
             return False
         job, lease = claimed
         try:
-            async with asyncio.timeout(self.creator_settings.job_timeout_seconds):
+            async with asyncio.timeout(self.settings.job_timeout_seconds):
                 await self.process(job, lease)
         except asyncio.CancelledError:
             # The lease makes shutdown/restart recoverable. In-flight external actions
@@ -47,13 +46,11 @@ class Worker:
 
     async def process(self, job, lease):
         request = CreateRequest.model_validate(job["request"])
-        if request.wallet not in self.settings.addresses():
-            raise ValueError("Unknown receiving wallet")
         if job["adapter"]:
-            await self.validate_publish(job, lease)
+            await self.validate_sample(job, lease)
             return
         async with self.browser_factory(
-            self.creator_settings, self.network, self.vault, job["id"]
+            self.settings, self.network, self.vault, job["id"]
         ) as browser:
             if job["approved_action"]:
                 action = BrowserAction.model_validate(job["approved_action"])
@@ -131,41 +128,21 @@ class Worker:
                     "Inference step limit reached; submit a new job with a narrower goal",
                 )
                 return
-        await self.validate_publish(job, lease)
+        await self.validate_sample(job, lease)
 
     def observe(self, job, observation):
         # Apply redaction to links and field metadata as well as page text.
         clean = self.vault.redact(job["id"], json.dumps(observation))
         job["observations"].append(json.loads(clean))
 
-    async def validate_publish(self, job, lease):
+    async def validate_sample(self, job, lease):
         spec = Adapter.model_validate(job["adapter"])
-        provider, entry = self.runtime.compile(job)
-        sample = provider.tools[0].input_model.model_validate(spec.sample_input).model_dump()
-        result = await self.runtime.invoke(job, spec, sample)
+        result = await self.runtime.invoke(job, spec, spec.sample_input)
         if len(json.dumps(result, allow_nan=False).encode()) > 1_000_000:
             raise ValueError("Sample result exceeds provider response limit")
-        app, entry = self.runtime.build(job)
-        # Exercise real provider startup and unpaid MPP challenge before publishing.
-        import httpx
-
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=self.creator_settings.base_url
-            ) as client:
-                response = await client.post(
-                    f"/{entry.id}",
-                    json=sample,
-                    headers={
-                        "Idempotency-Key": "creator-validation",
-                        "X-OpenMCP-Execution-ID": "creator-validation",
-                    },
-                )
-                if response.status_code != 402 or "WWW-Authenticate" not in response.headers:
-                    raise ValueError("Generated endpoint did not produce an MPP challenge")
-        self.store.publish(job, lease, entry)
+        self.store.ready(job, lease)
 
     async def run(self):
         while True:
             if not await self.run_once():
-                await asyncio.sleep(self.creator_settings.poll_seconds)
+                await asyncio.sleep(self.settings.poll_seconds)

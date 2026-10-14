@@ -11,21 +11,21 @@ The operator confirmed this provider may be used through OpenMCP. BuiltWith's pu
 
 ## Setup
 
-Set `BUILTWITH_API_KEY` in the private worker environment. Never put its value in the catalog. The adapter uses the free API's documented query-key authentication on the outgoing HTTPS request only. The shared caller strips query strings from HTTPX request logs, including the private key. External monitoring must also redact request query strings.
+Set `BUILTWITH_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-Apply the new `20261007060000_builtwith.sql` migration using your existing privileged migration process. Do not edit already deployed migrations. Then register the provider using the target database URL and account mode:
+The adapter sends the key as a vendor query parameter. Keep request query strings redacted in external logs.
 
-```sh
-uv run openmcp builtwith register
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
+
+```bash
+uv run openmcp providers validate builtwith
+uv run openmcp providers register builtwith
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-This upserts BuiltWith without deleting other providers. For file-catalog setups:
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-```sh
-uv run openmcp builtwith catalog --output catalog/builtwith.json --mode test
-```
-
-The committed catalog is test-mode; production registration uses your configured product mode. Deploy the updated API/worker and configure the worker key separately. Catalog files alone do not register production database services.
 
 ## Limits and recovery
 

@@ -66,34 +66,17 @@ Vendor usage accounting does not predict when your free allowance runs out.
 
 ## Register and run
 
-Apply the new additive migration before deploying the API/worker:
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
 ```bash
-uv run python -m openmcp.product.cli migrate
+uv run openmcp providers validate tavily
+uv run openmcp providers register tavily
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-If `OPENMCP_PRODUCT_CATALOG` is unset (your current local configuration), add or update all five
-Tavily endpoints in the database-managed catalog without deleting existing entries:
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-```bash
-uv run openmcp tavily register
-```
-
-If using a file-managed catalog, merge Tavily into your **existing full approved catalog**:
-
-```bash
-uv run openmcp tavily catalog --output catalog/dataforseo.json --mode test
-```
-
-Use the actual path configured by `OPENMCP_PRODUCT_CATALOG` if different. If the
-catalog is managed only in PostgreSQL, export/preserve that full approved list
-before adopting file-based sync: startup deletes catalog entries missing from the file.
-The chosen mode must match `OPENMCP_PRODUCT_MODE` on API and worker.
-**Tavily has no sandbox here: both account modes call the real API and consume credits.**
-`catalog/tavily.json` is a standalone example, not a replacement for a catalog
-that already contains other providers.
-Set `OPENMCP_PRODUCT_CATALOG` consistently on API and worker; restart both.
-Keys are needed only by the worker. This integration does not require a crypto signer.
 
 ## Minimal verification
 
@@ -106,7 +89,7 @@ uv run pytest tests/test_tavily.py -q
 One explicitly requested live check consumes one credit, with no retry:
 
 ```bash
-uv run openmcp tavily check --allow-one-credit
+uv run openmcp providers check tavily --allow-one-credit
 ```
 
 The check validates the vendor protocol directly; it does not debit an OpenMCP

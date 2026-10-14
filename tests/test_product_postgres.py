@@ -31,6 +31,7 @@ from openmcp.product.settlement import TerminalFailure
 from openmcp.product.store import Store
 from openmcp.product.stripe import StripeGateway
 from openmcp.product.worker import Worker
+from openmcp.providers import load_catalog
 
 
 @pytest.fixture(scope="module")
@@ -360,8 +361,9 @@ def test_worker_lock_excludes_second_process_and_webhook_acceptance_deduplicates
 
 
 async def test_http_stripe_to_wallet_to_service_success_and_failure(store, service, tmp_path):
-    catalog = tmp_path / "catalog.json"
-    catalog.write_text(json.dumps([service.model_dump()]))
+    store.sync_catalog(
+        [Provider(provider_id="example", name="Example", description="Example", queries=[service])]
+    )
     private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public = (
         private.public_key()
@@ -370,7 +372,6 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
     )
     settings = ProductSettings(
         _env_file=None,
-        catalog_path=catalog,
         clerk_issuer="https://clerk.example",
         clerk_public_key=public,
         stripe_key="sk_test_testing",
@@ -416,7 +417,7 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
     }
     human = {"Authorization": "Bearer " + jwt.encode(claims, private, algorithm="RS256")}
 
-    class Provider:
+    class SettlementFixture:
         fail = False
         ensure_lock = staticmethod(lambda _: None)
 
@@ -426,7 +427,7 @@ async def test_http_stripe_to_wallet_to_service_success_and_failure(store, servi
             store.mark_paid(row["execution_id"], {"reference": "0xpaid"})
             store.finish(row["execution_id"], data={"answer": "delivered"})
 
-    provider = Provider()
+    provider = SettlementFixture()
     worker = Worker(settings, store, stripe, provider)
     try:
         async with httpx.AsyncClient(
@@ -567,7 +568,6 @@ async def test_no_providers_worker_credits_stripe_and_discovery_is_empty(store):
     settings = ProductSettings(
         _env_file=None,
         mode="live",
-        catalog_path=None,
         treasury_key_file=None,
         stripe_key="rk_live_fixture",
         stripe_webhook_secret="whsec_fixture",
@@ -634,13 +634,13 @@ async def test_no_signer_worker_preserves_mpp_recovery_after_catalog_removal(sto
     )
     assert store.requires_treasury("test")
     assert not store.requires_treasury("live")
-    store.sync_catalog([])
+    store.sync_catalog([], prune=True)
     assert not store.requires_treasury("test")
     owner = store.bootstrap("recovery")["account_id"]
     credit(store, owner)
     principal, _ = grant(store, owner)
     row = store.reserve(principal, "pending", purchase(service), service)
-    store.sync_catalog([])
+    store.sync_catalog([], prune=True)
     # Historical MPP snapshots predate the explicit settlement field.
     with store.connection() as c:
         c.execute("UPDATE executions SET service=service-'settlement'")
@@ -654,37 +654,31 @@ async def test_no_signer_worker_preserves_mpp_recovery_after_catalog_removal(sto
     assert not store.requires_treasury("test")
 
 
-def test_catalog_sync_replaces_rows_without_touching_purchases(store, service, tmp_path):
-    catalog = tmp_path / "catalog.json"
-    catalog.write_text(json.dumps([service.model_dump()]))
-    settings = ProductSettings(_env_file=None, catalog_path=catalog)
-    store.sync_catalog(settings.catalog())
-    assert store.catalog_service(service.endpoint_id).model_dump() == service.model_dump()
-    with store.connection() as connection:
-        provider_id = connection.execute(
-            "SELECT provider_id FROM queries WHERE endpoint_id=%s", (service.endpoint_id,)
-        ).fetchone()["provider_id"]
-    assert provider_id == service.endpoint_id
+def test_catalog_publication_preserves_other_providers_and_purchase_snapshots(store, service):
+    from openmcp.providers import publish
 
+    def definition(query):
+        return Provider(
+            provider_id=query.endpoint_id,
+            name=query.name,
+            description=query.description,
+            queries=[query],
+        )
+
+    publish(store, [definition(service)], "test", enable=True)
     owner = store.bootstrap("subject")["account_id"]
     credit(store, owner)
     principal, _ = grant(store, owner)
     execution = store.reserve(principal, "keep", purchase(service), service)
     other = service.model_copy(update={"endpoint_id": "other-service", "name": "Other"})
-    catalog.write_text(json.dumps([other.model_dump()]))
-    store.sync_catalog(ProductSettings(_env_file=None, catalog_path=catalog).catalog())
-    assert store.catalog_service(service.endpoint_id) is None
-    assert store.catalog_service("other-service").name == "Other"
-    saved = store.execution_internal(execution["execution_id"])
-    assert saved["endpoint_id"] == service.endpoint_id
-    assert saved["service"]["price_cents"] == service.price_cents
-
-    store.sync_catalog(None)
-    assert store.service_count("test") == 1
-    catalog.write_text("[]")
-    store.sync_catalog(ProductSettings(_env_file=None, catalog_path=catalog).catalog())
-    assert store.service_count("test") == 0
-    assert store.execution_internal(execution["execution_id"])["endpoint_id"] == service.endpoint_id
+    publish(store, [definition(other)], "test", enable=True)
+    publish(store, [], "test")
+    assert store.service_count("test") == 2
+    store.set_service_enabled(service.endpoint_id, False, "test")
+    assert store.service(service.endpoint_id, "test") is None
+    assert store.execution_internal(execution["execution_id"])["service"]["price_cents"] == 40
+    store.set_service_enabled(service.endpoint_id, True, "test")
+    assert store.service_count("test") == 2
 
 
 async def test_discover_groups_queries_under_providers(store, tmp_path):
@@ -725,8 +719,9 @@ async def test_discover_groups_queries_under_providers(store, tmp_path):
             ]
         )
     )
+    store.sync_catalog(load_catalog(catalog))
     app = create_app(
-        ProductSettings(_env_file=None, catalog_path=catalog),
+        ProductSettings(_env_file=None),
         store=store,
         verifier=Closable(),
         stripe=Closable(),

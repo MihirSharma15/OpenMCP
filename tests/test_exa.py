@@ -7,8 +7,8 @@ import httpx
 import pytest
 
 from openmcp.integrations.exa.catalog import CONTENTS, ORIGIN, SEARCH, SERVICES, provider
-from openmcp.integrations.exa.cli import write_catalog
 from openmcp.integrations.exa.protocol import parse, prepare
+from openmcp.integrations.transport import Request
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
 from openmcp.product.config import ProductSettings, Provider
@@ -106,14 +106,7 @@ def test_unusable_content_is_not_captured(issue):
         parse(CONTENTS, payload, body)
 
 
-def test_catalog_merge_and_route_validation(tmp_path):
-    from openmcp.integrations.firecrawl.catalog import provider as firecrawl
-
-    path = tmp_path / "catalog.json"
-    path.write_text(json.dumps([firecrawl()]))
-    write_catalog(path, "test")
-    write_catalog(path, "test")
-    assert [p["provider_id"] for p in json.loads(path.read_text())] == ["firecrawl", "exa"]
+def test_catalog_route_restrictions():
     definition = provider()
     definition["queries"][0]["url"] = ORIGIN + "/answer"
     with pytest.raises(ValueError):
@@ -243,7 +236,7 @@ async def test_compressed_vendor_response_is_decoded_once():
         ProductSettings(_env_file=None), None, transport=httpx.MockTransport(handler)
     )
     try:
-        response = await caller._post(service(SEARCH), b"{}", {})
+        response = await caller._request(Request(service(SEARCH).url, content=b"{}"))
         assert "content-encoding" not in response.headers
         data, _, cost = parse(SEARCH, payload, response.json())
         assert data["provider"] == "Exa" and cost == 7000

@@ -10,8 +10,8 @@ import httpx
 import pytest
 
 from openmcp.integrations.dataforseo.catalog import OVERVIEW, RELATED, SEARCH, provider
-from openmcp.integrations.dataforseo.cli import write_catalog
 from openmcp.integrations.dataforseo.protocol import Rejected, cost_microusd, parse, prepare
+from openmcp.integrations.transport import Request
 from openmcp.product.api_call import ApiKeyCaller
 from openmcp.product.app import create_app
 from openmcp.product.config import ProductSettings, Provider
@@ -160,19 +160,6 @@ def test_http_200_is_not_proof_of_completed_task_or_zero_cost():
     assert not isinstance(raised.value, Rejected)
 
 
-def test_catalog_command_preserves_other_providers(tmp_path):
-    from tests.test_product_api_call import api_service, provider_for
-
-    path = tmp_path / "catalog.json"
-    other = provider_for(api_service()).model_dump()
-    path.write_text(json.dumps([other]))
-    write_catalog(path, "test")
-    write_catalog(path, "test")
-    catalog = json.loads(path.read_text())
-    assert len(catalog) == 2 and catalog[0] == other
-    assert len(catalog[1]["queries"]) == 3
-
-
 @pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
 async def test_discover_execute_replay_and_saved_receipt_in_postgres(store, monkeypatch, encoding):
     monkeypatch.setenv("DATAFORSEO_AUTH", SECRET)
@@ -265,7 +252,7 @@ async def test_compressed_response_limit_applies_to_decoded_body():
     )
     try:
         with pytest.raises(TerminalFailure, match="exceeded the maximum size"):
-            await caller._post(service_for(SEARCH), "[]", {})
+            await caller._request(Request(service_for(SEARCH).url, content=b"[]"))
     finally:
         await caller.close()
 
@@ -347,9 +334,9 @@ async def test_crash_after_receipt_recovers_saved_result_without_resubmission(st
 
 def test_additive_migration_preserves_old_contract_and_detects_missing_columns(store):
     with store.connection() as connection:
-        assert connection.execute("SELECT version FROM schema_version").fetchone()["version"] == 1
+        assert connection.execute("SELECT version FROM schema_version").fetchone()["version"] == 2
     store.database.check_schema_version()
     with store.connection() as connection:
         connection.execute("ALTER TABLE queries DROP COLUMN adapter")
-    with pytest.raises(RuntimeError, match="run account migrate"):
+    with pytest.raises(RuntimeError, match="run openmcp migrate"):
         store.database.check_schema_version()

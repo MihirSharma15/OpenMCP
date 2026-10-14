@@ -28,7 +28,7 @@ def migration_sql(schema="openmcp_product"):
     checks = list(
         re.finditer(
             r"ALTER TABLE queries ADD CONSTRAINT queries_adapter_check\s+"
-            r"CHECK \(adapter IN \([^;]+\)\);",
+            r"CHECK \([^;]+\);",
             combined,
         )
     )

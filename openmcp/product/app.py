@@ -1,4 +1,4 @@
-"""FastAPI account API. This app does not mount any demo credit mutation routes."""
+"""FastAPI account API for users and agent credentials."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -92,12 +92,9 @@ def create_app(settings=None, *, store=None, verifier=None, stripe=None):
         try:
             store.database.check_schema_version()
             store.bind_runtime(settings)
-            store.sync_catalog(settings.catalog())
         except Exception:
             store.close()
             raise
-    else:
-        store.sync_catalog(settings.catalog())
     verifier = verifier or ClerkVerifier(settings)
     stripe = stripe or StripeGateway(settings, store)
 

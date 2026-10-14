@@ -52,10 +52,10 @@ class Change:
         return "create" if self.before is None else "update"
 
 
-def skill_text(mode="demo"):
-    if mode not in ("demo", "account"):
-        raise InstallError("Choose demo or account mode.")
-    folder = "openmcp-account" if mode == "account" else "openmcp"
+def skill_text(mode="account"):
+    if mode != "account":
+        raise InstallError("Only account mode is supported.")
+    folder = "openmcp"
     return files("openmcp.client_setup").joinpath(f"skills/{folder}/SKILL.md").read_text("utf-8")
 
 
@@ -64,26 +64,26 @@ def runtime_directory(value: Path | None = None):
         root = value.expanduser().resolve()
     else:
         checkout = Path(__file__).resolve().parents[2]
-        root = checkout if (checkout / "catalog/providers.json").is_file() else Path.cwd()
+        root = checkout if (checkout / "pyproject.toml").is_file() else Path.cwd()
         root = root.resolve()
     if not root.is_dir():
         raise InstallError(f"Runtime directory does not exist: {root}")
     return root
 
 
-def server_entry(runtime_dir: Path, mode="demo"):
-    if mode not in ("demo", "account"):
-        raise InstallError("Choose demo or account mode.")
+def server_entry(runtime_dir: Path, mode="account"):
+    if mode != "account":
+        raise InstallError("Only account mode is supported.")
     # Do not resolve this symlink: resolving venv/bin/python can discard the venv.
     return {
         "command": str(Path(sys.executable).absolute()),
         "args": ["-m", "openmcp.client_setup.launch"]
-        + (["--mode", "account"] if mode == "account" else [])
+        + ["--mode", "account"]
         + ["--runtime-dir", str(runtime_dir)],
     }
 
 
-def export_config(runtime_dir: Path, format: str, mode="demo"):
+def export_config(runtime_dir: Path, format: str, mode="account"):
     entry = server_entry(runtime_dir, mode)
     if format == "toml":
         return tomlkit.dumps({"mcp_servers": {"openmcp": {**entry, "tool_timeout_sec": 180}}})
@@ -151,7 +151,7 @@ def _config_change(path, entry, *, toml=False, replace=False):
     return Change(path, original, content)
 
 
-def _skill_change(path, *, replace, mode="demo"):
+def _skill_change(path, *, replace, mode="account"):
     original, content = _read(path), skill_text(mode)
     if original is not None and original != content and not replace:
         raise InstallError(
@@ -161,7 +161,7 @@ def _skill_change(path, *, replace, mode="demo"):
 
 
 def plan_install(
-    client, scope, project, runtime_dir, *, replace=False, home=None, environ=None, mode="demo"
+    client, scope, project, runtime_dir, *, replace=False, home=None, environ=None, mode="account"
 ):
     """Preflight every destination before changing any configuration."""
     if client not in (*CLIENTS, "all") or scope not in ("project", "user"):
@@ -245,6 +245,8 @@ def apply_plan(changes):
 
 
 def register_commands(commands):
+    import argparse
+
     parser = commands.add_parser("install", help="Install MCP tools and skill for an AI client")
     parser.add_argument("client", choices=(*CLIENTS, "all"))
     parser.add_argument("--scope", choices=("project", "user"), default="project")
@@ -261,7 +263,7 @@ def register_commands(commands):
     export.add_argument("--runtime-dir", type=Path)
     for command in (parser, export):
         command.add_argument(
-            "--mode", choices=("demo", "account"), default=os.environ.get("OPENMCP_MODE", "demo")
+            "--mode", choices=("account",), default="account", help=argparse.SUPPRESS
         )
 
 
@@ -287,11 +289,7 @@ def run(args):
     print(
         "Restart your client and enable/trust the OpenMCP server to load balance, discover, execute."
     )
-    if args.mode == "account":
-        print("Account mode also includes execution_status. Run openmcp check-mcp --mode account.")
-        print("Use openmcp connect to save a dashboard-issued agent credential privately.")
-        return
     print(
-        "The local gateway/provider stack must be running; run openmcp check-mcp from the runtime directory."
+        "Use execution_status for pending purchases. Run openmcp check-mcp to verify the connection."
     )
-    print("This setup shares one demo agent wallet. Use only one purchasing client at a time.")
+    print("Use openmcp connect to save a dashboard-issued agent credential privately.")

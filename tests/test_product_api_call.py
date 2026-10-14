@@ -20,6 +20,7 @@ from openmcp.product.models import now
 from openmcp.product.settlement import TerminalFailure
 from openmcp.product.store import Store
 from openmcp.product.worker import Worker
+from openmcp.providers import load_catalog
 
 SECRET = "omcp-test-secret-9f3a"
 REF = "OPENMCP_TEST_PROVIDER_KEY"
@@ -85,7 +86,7 @@ def _catalog(tmp_path, query, secret_ref=REF):
         provider["secret_ref"] = secret_ref
     path = tmp_path / "catalog.json"
     path.write_text(json.dumps([provider]))
-    return ProductSettings(_env_file=None, catalog_path=path).catalog()
+    return load_catalog(path)
 
 
 def test_default_settlement_stays_mpp_and_secret_ref_is_not_a_service_field():
@@ -130,7 +131,12 @@ def test_catalog_rejects_private_urls_and_allows_test_loopback(tmp_path):
         with pytest.raises(ValueError):
             api_service(url=url, mode=mode, settlement="mpp", recipient="0x" + "ab" * 20)
 
-    for url in ("http://127.0.0.1:8080/q", "http://127.1.2.3/q", "http://[::1]/q", "http://localhost/q"):
+    for url in (
+        "http://127.0.0.1:8080/q",
+        "http://127.1.2.3/q",
+        "http://[::1]/q",
+        "http://localhost/q",
+    ):
         service = api_service(url=url)
         assert service.url == url
 
@@ -401,7 +407,9 @@ async def test_private_url_on_a_reserved_execution_refunds_without_calling(store
 
 
 @pytest.mark.parametrize("failure", ["status", "timeout"])
-async def test_failure_after_sent_holds_without_refund_retry_or_disable(store, monkeypatch, failure):
+async def test_failure_after_sent_holds_without_refund_retry_or_disable(
+    store, monkeypatch, failure
+):
     monkeypatch.setenv(REF, SECRET)
     service = api_service()
     calls = []

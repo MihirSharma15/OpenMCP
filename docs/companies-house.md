@@ -22,40 +22,21 @@ Results include pagination with `next_start_index`; agents can buy more pages.
 
 ## Configuration and registration
 
-Create a live application and an API-key client in the Companies House developer
-hub. Set this private variable in the worker environment and ignored local `.env`:
+Set `COMPANIES_HOUSE_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-```dotenv
-COMPANIES_HOUSE_API_KEY=your_private_key
-```
+Create a live application and API-key client in the Companies House developer hub. Both account modes use the live public-data API.
 
-No key belongs in catalog JSON, browser variables or agent credentials. Add the
-migration `supabase/migrations/20261007040000_companies_house.sql` through the
-existing privileged migration deployment process. It extends the adapter check
-constraint without editing older migrations. Runtime Supabase credentials do not
-have DDL permissions. For isolated local development, the existing migration
-command applies the SQL using the configured schema:
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
 ```bash
-uv run python -m openmcp.product.cli migrate
-uv run openmcp companies-house register
+uv run openmcp providers validate companies-house
+uv run openmcp providers register companies-house
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
 ```
 
-Registration upserts this provider and its four queries without deleting others.
-It targets the configured database, schema and account mode; local registration
-does not register the deployed marketplace. For database-managed catalogs leave
-`OPENMCP_PRODUCT_CATALOG` unset on both API and worker. Deploy updated API and
-worker code and set the worker's key separately. This integration needs no MPP
-signer; other enabled MPP services may still need one.
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-For a file-managed catalog, merge into the full approved catalog instead:
-
-```bash
-uv run openmcp companies-house catalog --output catalog/providers.json --mode live
-```
-
-The committed `catalog/companies-house.json` is an isolated test-mode definition.
-Do not replace a deployed full catalog with this standalone file.
 
 ## Safety and recovery
 

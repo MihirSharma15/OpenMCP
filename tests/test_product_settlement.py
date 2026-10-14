@@ -12,10 +12,9 @@ from eth_hash.auto import keccak
 from mpp import BodyDigest, Challenge, Credential, Receipt
 from mpp.methods.tempo import TempoAccount
 
-from openmcp.payments import memo_for
 from openmcp.product.config import ProductSettings, Service
 from openmcp.product.models import canonical, now
-from openmcp.product.settlement import PendingPayment, TerminalFailure, Treasury
+from openmcp.product.settlement import PendingPayment, TerminalFailure, Treasury, memo_for
 
 
 @pytest.fixture

@@ -67,29 +67,19 @@ OpenMCP's idempotency header.
 
 ## Setup
 
-1. Set `API2PDF_API_KEY` in the private worker environment (`.env` for local work).
-   Keys stay out of discovery, payloads, receipts and browser code. Authorization
-   uses the raw key in the header, not a query parameter.
-2. Apply the additive `20261007080000_api2pdf.sql` migration with the operator's
-   migration credentials. It widens the adapter check; it does not seed providers.
-   Use the existing migration tool for the intended schema, including
-   `openmcp_product_live` when deploying there. Never edit already-run migrations.
-3. Register the provider with the intended database and account mode configured:
+Set `API2PDF_API_KEY` in the private worker environment. The database stores only the variable name, never the credential.
 
-   ```sh
-   uv run openmcp api2pdf register
-   ```
+Apply the account migrations and follow [provider onboarding](providers.md) against the intended deployment. Publication is explicit and disabled by default:
 
-   Or merge into an explicitly configured approved file catalog:
+```bash
+uv run openmcp providers validate api2pdf
+uv run openmcp providers register api2pdf
+uv run openmcp providers list
+uv run openmcp providers enable ENDPOINT_ID
+```
 
-   ```sh
-   uv run openmcp api2pdf catalog --output catalog/api2pdf.json --mode test
-   ```
+Registration does not call the vendor or remove other providers. Configure the worker credential and restart the worker before enabling purchases. `OPENMCP_PRODUCT_MODE` chooses the account mode; test mode does not imply free vendor requests.
 
-   Other providers are preserved. `test` is OpenMCP account mode, **not an API2PDF
-   sandbox**; either mode consumes the provider account's real credit.
-4. Deploy the updated worker, API and private worker key together. Local JSON
-   generation alone does not register the provider in production PostgreSQL.
 
 ## Tests
 

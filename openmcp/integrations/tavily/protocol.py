@@ -2,14 +2,11 @@
 
 from jsonschema import Draft202012Validator
 
+from ..transport import Rejected
 from .catalog import ADVANCED, EXTRACT_ADVANCED, MAP, SEARCH, SERVICES
 
 # Published paid replacement rate, in microdollars per credit; override for your plan.
 DEFAULT_CREDIT_COST_MICROUSD = 8000
-
-
-class Rejected(ValueError):
-    """All requested extraction targets failed, with explicit zero vendor usage."""
 
 
 def validate_target(endpoint_id, url, mode):
