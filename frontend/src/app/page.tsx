@@ -1,67 +1,94 @@
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight, ArrowUpRight, Check, Play } from "lucide-react";
 import AudienceSwitch from "@/components/audience-switch";
 import { AuthControls } from "@/components/account/auth-controls";
 import { clerkConfigured } from "@/lib/account-config";
+import { AmbientScene } from "@/components/landing/ambient-scene";
+import { TempleArt } from "@/components/landing/temple-art";
+import { ProductDemo } from "@/components/landing/product-demo";
+import "./landing.css";
 
 export default function Home() {
   return (
-    <div className="landing">
+    <div className="landing landing-studio" id="top">
       <a href="#main" className="skip-link">
         Skip to content
       </a>
       <nav className="landing-nav container" aria-label="Primary">
         <a href="#top" className="wordmark">
+          <svg
+            className="landing-logomark"
+            width="22"
+            height="23"
+            viewBox="0 0 22 23"
+            aria-hidden="true"
+          >
+            <path d="M11 1 1 18h7l3-5 3 5h7L11 1Z" fill="currentColor" />
+            <path d="m8 20 3-5 3 5-3 2-3-2Z" fill="var(--violet)" />
+          </svg>
           OpenMCP
         </a>
         <div className="nav-links">
           <a href="#how">For agents</a>
           <a href="#services">For APIs</a>
-          <a href="#endpoints">Agent tools</a>
+          <a href="#in-action">How it works</a>
           <AuthControls enabled={clerkConfigured()} />
         </div>
       </nav>
 
       <main id="main" className="landing-main">
-        <section id="top" className="hero container">
-          <div className="eyebrow accent">
-            Pay-per-call access for AI agents
-          </div>
-          <h1>Unlimited APIs. One Wallet.</h1>
-          <p className="hero-description">
-            Fund one wallet. Give your AI agent a spending limit. Let it
-            discover useful services, pay per request, and bring the results
-            back. Every purchase and refund in one place.
-          </p>
-          <div className="hero-actions">
-            <Button asChild variant="default">
-              <Link href="/dashboard" className="button">
-                Open your wallet
-              </Link>
-            </Button>
-            <Link href="/dashboard/agents" className="text-link">
-              Connect your agent
-            </Link>
+        <section className="landing-hero" aria-labelledby="hero-title">
+          <AmbientScene>
+            <TempleArt />
+          </AmbientScene>
+          <div className="hero container">
+            <div className="hero-eyebrow eyebrow">
+              <span className="hero-eyebrow-line" /> THE INTERNET, OPEN TO YOUR
+              AGENT
+            </div>
+            <h1 id="hero-title">
+              Unlimited APIs.
+              <br />
+              <span>One wallet.</span>
+            </h1>
+            <p className="hero-description">
+              Give your agent the freedom to get things done.
+              <br className="hero-description-break" /> One wallet to discover
+              services, pay per request,
+              <br className="hero-description-break" /> and bring the results
+              back.
+            </p>
+            <div className="hero-actions">
+              <Button asChild variant="default" className="hero-primary">
+                <Link href="/dashboard">
+                  Open your wallet <ArrowUpRight />
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" className="hero-watch">
+                <a href="#in-action">
+                  <Play size={14} /> See how it works
+                </a>
+              </Button>
+            </div>
+            <div className="hero-assurances">
+              <span>
+                <Check /> Your limits, always
+              </span>
+            </div>
           </div>
         </section>
 
-        <div className="hero-art container">
-          <Image
-            src="/images/lavender-temple.jpeg"
-            alt="A classical temple in blue mist, a deer in the grass and a lone figure walking past"
-            width={1676}
-            height={938}
-            preload
-            unoptimized
-            sizes="(max-width: 767px) calc(100vw - 40px), (max-width: 1279px) calc(100vw - 96px), 1200px"
-          />
-        </div>
+        <ProductDemo />
 
         <section className="why-section container section-space">
           <div className="section-heading why-heading">
-            <div className="eyebrow">Why now</div>
-            <h2>Agents need more services than anyone will sign up for.</h2>
+            <div className="eyebrow">A MORE OPEN INTERNET</div>
+            <h2>
+              Good work shouldn’t
+              <br />
+              stop at a sign-up form.
+            </h2>
           </div>
           <div className="why-copy muted">
             <p>
@@ -84,7 +111,7 @@ export default function Home() {
           className="endpoints-section container section-space"
         >
           <div className="section-heading">
-            <div className="eyebrow">Your agent’s toolkit</div>
+            <div className="eyebrow">YOUR AGENT’S TOOLKIT</div>
             <h2>Find it. Buy it. Follow the result.</h2>
           </div>
           <div className="endpoint-grid">
@@ -121,15 +148,18 @@ export default function Home() {
 
         <section className="account-callout container">
           <div className="callout-copy">
-            <div className="eyebrow accent">Your workspace</div>
-            <h2>Your wallet. Your limits. Every transaction.</h2>
+            <div className="eyebrow accent">THE NEXT MOVE IS YOURS</div>
+            <h2>
+              A little funding.
+              <br />A lot of possibility.
+            </h2>
             <p className="muted">
               Manage your balance, give each agent a spending allowance, and
               follow its purchases from request to result.
             </p>
             <Button asChild variant="default">
               <Link href="/dashboard" className="button">
-                Go to your dashboard
+                Open your workspace <ArrowRight size={16} />
               </Link>
             </Button>
           </div>
@@ -152,6 +182,8 @@ export default function Home() {
 
       <footer className="landing-footer container">
         <span>OpenMCP</span>
+        <span>Made for agents. Controlled by you.</span>
+        <a href="#top">Back to top ↑</a>
       </footer>
     </div>
   );

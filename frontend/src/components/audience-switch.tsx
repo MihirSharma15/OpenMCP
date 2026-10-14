@@ -77,6 +77,9 @@ export default function AudienceSwitch() {
       className="audience-section container section-space"
       aria-label="OpenMCP for agents and APIs"
     >
+      <div className="eyebrow audience-section-label">
+        BOTH SIDES OF THE CONNECTION
+      </div>
       <Tabs value={selected} onValueChange={select} className="audience-tabs">
         <TabsList
           id="services"
@@ -105,11 +108,8 @@ export default function AudienceSwitch() {
                 <p>{audience.description}</p>
               </div>
               <ul className="audience-benefits">
-                {audience.benefits.map(([title, description], benefitIndex) => (
+                {audience.benefits.map(([title, description]) => (
                   <li key={title}>
-                    <span className="audience-number" aria-hidden="true">
-                      0{benefitIndex + 1}
-                    </span>
                     <h3>{title}</h3>
                     <p>{description}</p>
                   </li>
