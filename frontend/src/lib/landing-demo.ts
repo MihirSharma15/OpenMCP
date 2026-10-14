@@ -54,3 +54,7 @@ export const demoProviders = [
 export function nextDemoStage(stage: number) {
   return Math.min(stage + 1, demoStages.length - 1);
 }
+
+export function formatDemoCost(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}

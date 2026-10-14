@@ -5,10 +5,12 @@ import { motion } from "motion/react";
 import {
   ArrowUpRight,
   Bot,
+  Ellipsis,
   Pause,
   Play,
   RotateCcw,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +20,7 @@ import {
   DEMO_STAGE_DURATION_MS,
   demoProviders,
   demoStages,
+  formatDemoCost,
   nextDemoStage,
 } from "@/lib/landing-demo";
 import { useAnimationVisibility } from "./use-animation-visibility";
@@ -144,30 +147,65 @@ export function ProductDemo() {
               animate={{ opacity: 1 }}
               transition={transition}
             >
-              <div className="demo-service-flow">
-                <div className="demo-agent">
+              <div
+                className="demo-service-flow"
+                role="group"
+                aria-label="Your agent connects to the OpenMCP wallet, then to the providers"
+              >
+                <div className="demo-agent demo-flow-node">
                   <Bot size={34} strokeWidth={1.2} aria-hidden="true" />
                   <span>Your agent</span>
                 </div>
                 <svg
+                  className="demo-transfer"
+                  viewBox="0 0 60 12"
+                  preserveAspectRatio="none"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path d="M0 6H57M52 2L57 6L52 10" stroke="#e1dce5" />
+                  <motion.path
+                    d="M0 6H57M52 2L57 6L52 10"
+                    stroke="#9687aa"
+                    initial={{ pathLength: reducedMotion ? 1 : 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{
+                      duration: reducedMotion ? 0 : 0.45,
+                      delay: reducedMotion ? 0 : 0.1,
+                    }}
+                  />
+                </svg>
+                <motion.div
+                  className="demo-wallet demo-flow-node"
+                  initial={{ opacity: 0, y: reducedMotion ? 0 : 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    ...transition,
+                    delay: reducedMotion ? 0 : 0.35,
+                  }}
+                >
+                  <Wallet size={34} strokeWidth={1.2} aria-hidden="true" />
+                  <span>OpenMCP</span>
+                </motion.div>
+                <svg
                   className="demo-branch"
-                  viewBox="0 0 110 150"
+                  viewBox="0 0 110 200"
                   preserveAspectRatio="none"
                   fill="none"
                   aria-hidden="true"
                 >
                   <path
-                    d="M0 75H110M35 75Q50 75 50 60V40Q50 25 65 25H110M50 75V110Q50 125 65 125H110"
+                    d="M0 100H35Q50 100 50 85V40Q50 25 65 25H110M50 75H110M35 100Q50 100 50 115V160Q50 175 65 175H110M50 125H110"
                     stroke="#e1dce5"
                   />
                   <motion.path
-                    d="M0 75H110M35 75Q50 75 50 60V40Q50 25 65 25H110M50 75V110Q50 125 65 125H110"
+                    d="M0 100H35Q50 100 50 85V40Q50 25 65 25H110M50 75H110M35 100Q50 100 50 115V160Q50 175 65 175H110M50 125H110"
                     stroke="#9687aa"
                     initial={{ pathLength: reducedMotion ? 1 : 0 }}
                     animate={{ pathLength: 1 }}
                     transition={{
                       duration: reducedMotion ? 0 : 0.9,
-                      delay: reducedMotion ? 0 : 0.15,
+                      delay: reducedMotion ? 0 : 0.65,
                     }}
                   />
                 </svg>
@@ -181,7 +219,7 @@ export function ProductDemo() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{
                         ...transition,
-                        delay: reducedMotion ? 0 : 0.35 + index * 0.35,
+                        delay: reducedMotion ? 0 : 0.9 + index * 0.3,
                       }}
                     >
                       <img
@@ -193,21 +231,35 @@ export function ProductDemo() {
                       />
                       <span
                         className="demo-service-price"
-                        aria-label={`Example cost: ${provider.exampleCostCents} cents`}
+                        aria-label={`Example cost: ${formatDemoCost(provider.exampleCostCents)}`}
                       >
-                        {provider.exampleCostCents}¢
+                        {formatDemoCost(provider.exampleCostCents)}
                       </span>
                     </motion.div>
                   ))}
+                  <motion.div
+                    className="demo-service demo-more-providers"
+                    initial={{ opacity: 0, x: reducedMotion ? 0 : -5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      ...transition,
+                      delay: reducedMotion ? 0 : 1.8,
+                    }}
+                  >
+                    <Ellipsis size={20} strokeWidth={1.4} aria-hidden="true" />
+                    <span>More added every day</span>
+                  </motion.div>
                 </div>
               </div>
               <motion.div
                 className="demo-outcome"
                 initial={{ opacity: 0, y: reducedMotion ? 0 : 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ ...transition, delay: reducedMotion ? 0 : 1.5 }}
+                transition={{ ...transition, delay: reducedMotion ? 0 : 2 }}
               >
-                <p>No API keys. No extra sign-ups.</p>
+                <p>
+                  <span>No API keys.</span> <span>No extra sign-ups.</span>
+                </p>
               </motion.div>
             </motion.div>
           </TabsContent>

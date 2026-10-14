@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { demoProviders, demoStages, nextDemoStage } from "./landing-demo";
+import {
+  demoProviders,
+  demoStages,
+  formatDemoCost,
+  nextDemoStage,
+} from "./landing-demo";
 import temple from "../components/landing/temple-triangles.json";
 
 describe("illustrative landing walkthrough", () => {
+  it("formats example costs as dollar amounts with two decimal places", () => {
+    expect(
+      demoProviders.map((provider) =>
+        formatDemoCost(provider.exampleCostCents),
+      ),
+    ).toEqual(["$0.02", "$0.05", "$0.02"]);
+    expect(formatDemoCost(10)).toBe("$0.10");
+    expect(formatDemoCost(100)).toBe("$1.00");
+  });
   it("shows three local provider logos with explicitly modeled example costs", () => {
     expect(demoProviders.map((provider) => provider.name)).toEqual([
       "Exa",
