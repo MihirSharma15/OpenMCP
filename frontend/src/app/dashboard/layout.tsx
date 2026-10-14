@@ -4,6 +4,7 @@ import { apiOrigin } from "@/lib/account-proxy";
 import { SetupNeeded } from "@/components/account/setup-needed";
 import { AccountShell } from "@/components/account/shell";
 import "./account.css";
+import "./dashboard.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Your wallet — OpenMCP", robots: { index: false, follow: false } };

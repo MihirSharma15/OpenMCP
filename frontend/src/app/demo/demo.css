@@ -3,6 +3,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.budget-slider-control { width: 100%; margin: 10px 0 6px; }
+.budget-slider-labels { display: flex; justify-content: space-between; margin: 10px 0; color: var(--muted); font-size: 11px; }
+.budget-slider-control p { color: var(--muted); font-size: 11px; line-height: 18px; }
+
 .demo-header {
   height: 64px;
   padding: 0 48px;
@@ -278,7 +282,7 @@
   height: 44px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -290,9 +294,8 @@
 }
 
 .budget-input-shell:focus-within {
-  border-color: var(--violet);
+  border-color: var(--ink);
   background: white;
-  box-shadow: 0 0 0 3px rgb(98 89 166 / 10%);
 }
 
 .budget-input-shell.has-error {

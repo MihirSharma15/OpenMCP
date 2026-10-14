@@ -1,4 +1,19 @@
 "use client";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -29,15 +44,20 @@ function errorDetail(error: unknown): DemoError {
   if (error instanceof RunnerApiError) return error.detail;
   return {
     code: "demo_action_failed",
-    message: "The budget change failed. Retry without changing the active session.",
+    message:
+      "The budget change failed. Retry without changing the active session.",
     retryable: true,
   };
 }
 
 export default function Demo() {
   const [runnerState, setRunnerState] = useState<RunnerState | null>(null);
-  const [walletBalance, setWalletBalance] = useState<WalletBalance | undefined>();
-  const [budgetInput, setBudgetInput] = useState(formatBudgetInput(DEFAULT_BUDGET_CENTS));
+  const [walletBalance, setWalletBalance] = useState<
+    WalletBalance | undefined
+  >();
+  const [budgetInput, setBudgetInput] = useState(
+    formatBudgetInput(DEFAULT_BUDGET_CENTS),
+  );
   const [budgetInputError, setBudgetInputError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<DemoError | null>(null);
   const [actionError, setActionError] = useState<DemoError | null>(null);
@@ -74,7 +94,9 @@ export default function Demo() {
           nextChainPollRef.current = Date.now() + 5000;
         }
         if (budgetSessionRef.current !== sessionId) {
-          const nextBudget = clampBudgetCents(next.dashboard.agent.budget_cents);
+          const nextBudget = clampBudgetCents(
+            next.dashboard.agent.budget_cents,
+          );
           setBudgetInput(formatBudgetInput(nextBudget));
           setBudgetInputError(null);
           budgetSessionRef.current = sessionId;
@@ -83,7 +105,11 @@ export default function Demo() {
         setRunnerState(next);
         setPollError(null);
       } catch (error) {
-        if (!active || (error instanceof DOMException && error.name === "AbortError")) return;
+        if (
+          !active ||
+          (error instanceof DOMException && error.name === "AbortError")
+        )
+          return;
         setPollError(errorDetail(error));
       } finally {
         if (active) timer = window.setTimeout(poll, 1000);
@@ -120,7 +146,7 @@ export default function Demo() {
       setBudgetInput(formatBudgetInput(nextBudget));
       setBudgetInputError(null);
       setWalletBalance(undefined);
-      setRunnerState(previous =>
+      setRunnerState((previous) =>
         previous
           ? {
               dashboard: {
@@ -160,6 +186,11 @@ export default function Demo() {
   }
 
   const visibleError = actionError ?? pollError;
+  const parsedBudget = parseBudgetInput(budgetInput);
+  const sliderValue = parsedBudget.valid
+    ? parsedBudget.cents
+    : DEFAULT_BUDGET_CENTS;
+  const sliderMax = Math.max(10000, Math.ceil(sliderValue / 10000) * 10000);
   const offline =
     (pollError !== null && actionError === null) ||
     visibleError?.code === "runner_offline" ||
@@ -174,25 +205,39 @@ export default function Demo() {
       <header className="demo-header">
         <div className="demo-brand">
           <Link href="/" className="demo-wordmark">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M3 18V9a7 7 0 0 1 14 0v9" stroke="#161514" strokeWidth="1.6" />
-              <path d="M8 18v-6a2 2 0 0 1 4 0v6" stroke="#6259A6" strokeWidth="1.6" />
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 18V9a7 7 0 0 1 14 0v9"
+                stroke="#161514"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M8 18v-6a2 2 0 0 1 4 0v6"
+                stroke="#6259A6"
+                strokeWidth="1.6"
+              />
             </svg>
             <span>OpenMCP</span>
           </Link>
-          <span className="header-divider" />
+          <Separator orientation="vertical" className="header-divider" />
           <span className="demo-subtitle">Wallet observer</span>
         </div>
         <div className="demo-controls">
           <Link href="/providers" className="provider-dashboard-link">
             Providers ↗
           </Link>
-          <span
+          <Badge
             className="test-mode"
             title="Real MPP transfers using valueless Tempo Moderato test tokens."
           >
             Tempo testnet · valueless tokens
-          </span>
+          </Badge>
         </div>
       </header>
 
@@ -202,13 +247,19 @@ export default function Demo() {
             className={`demo-banner ${offline ? "offline-banner" : "error-banner"}`}
             role="alert"
           >
-            <strong>{offline ? "Local demo stack offline" : "Budget change failed"}</strong>
+            <strong>
+              {offline ? "Local demo stack offline" : "Budget change failed"}
+            </strong>
             <span>{visibleError.message}</span>
             {offline && <code>uv run python -m scripts.run_demo</code>}
           </section>
         )}
 
-        <section aria-labelledby="balance-heading" className="panel balance-panel">
+        <Card
+          as="section"
+          aria-labelledby="balance-heading"
+          className="panel balance-panel"
+        >
           <div className="panel-heading">
             <h1 id="balance-heading">Balance</h1>
           </div>
@@ -251,86 +302,147 @@ export default function Demo() {
               </small>
             </span>
             {walletBalance?.explorer_url ? (
-              <a href={walletBalance.explorer_url} target="_blank" rel="noreferrer">
+              <a
+                href={walletBalance.explorer_url}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {walletAmount(walletBalance)}
               </a>
             ) : (
               <span>{walletAmount(walletBalance)}</span>
             )}
           </div>
-        </section>
+        </Card>
 
-        <section aria-labelledby="budget-heading" className="panel budget-control-panel">
+        <Card
+          as="section"
+          aria-labelledby="budget-heading"
+          className="panel budget-control-panel"
+        >
           <div className="panel-heading">
             <h2 id="budget-heading">Session budget</h2>
           </div>
           <form className="budget-form" onSubmit={applyBudget}>
             <div className="budget-input-row">
-              <label htmlFor="budget-amount">Amount</label>
-              <div className={`budget-input-shell ${budgetInputError ? "has-error" : ""}`}>
+              <Label htmlFor="budget-amount">Amount</Label>
+              <div
+                className={`budget-input-shell ${budgetInputError ? "has-error" : ""}`}
+              >
                 <span aria-hidden="true">$</span>
-                <input
+                <Input
+                  variant="bare"
                   id="budget-amount"
                   type="text"
                   inputMode="decimal"
                   autoComplete="off"
                   value={budgetInput}
-                  onChange={event => updateBudgetFromInput(event.target.value)}
+                  onChange={(event) =>
+                    updateBudgetFromInput(event.target.value)
+                  }
                   onBlur={normalizeBudgetInput}
                   disabled={!runnerState || applying}
                   aria-invalid={Boolean(budgetInputError)}
-                  aria-describedby={budgetInputError ? "budget-input-error" : undefined}
+                  aria-describedby={
+                    budgetInputError ? "budget-input-error" : undefined
+                  }
                   aria-label="Session budget in USD"
                 />
                 <span>USD</span>
               </div>
             </div>
+            <div className="budget-slider-control">
+              <Slider
+                aria-label="Session budget"
+                aria-valuetext={`${money(sliderValue)} US dollars`}
+                min={1}
+                max={sliderMax}
+                step={1}
+                value={[Math.min(sliderValue, sliderMax)]}
+                disabled={!runnerState || applying}
+                onValueChange={([value]) =>
+                  updateBudgetFromInput(formatBudgetInput(value))
+                }
+              />
+              <div className="budget-slider-labels">
+                <span>$0.01</span>
+                <span>${money(sliderMax)}</span>
+              </div>
+              <p>
+                Applying a budget starts a new session and clears its
+                transaction history.
+              </p>
+            </div>
             {budgetInputError && (
-              <p id="budget-input-error" className="budget-input-error" role="alert">
+              <p
+                id="budget-input-error"
+                className="budget-input-error"
+                role="alert"
+              >
                 {budgetInputError}
               </p>
             )}
-            <button
+            <Button
+              variant="default"
               type="submit"
               className="button apply-button"
               disabled={!runnerState || applying || Boolean(budgetInputError)}
             >
               {applying ? "Applying…" : "Apply"}
-            </button>
+            </Button>
           </form>
-        </section>
+        </Card>
 
-        <section aria-labelledby="transactions-heading" className="panel transactions-panel">
+        <Card
+          as="section"
+          aria-labelledby="transactions-heading"
+          className="panel transactions-panel"
+        >
           <div className="panel-heading">
             <h2 id="transactions-heading">Recent transactions</h2>
-            <span>{state.rows.length} {state.rows.length === 1 ? "transaction" : "transactions"}</span>
+            <span>
+              {state.rows.length}{" "}
+              {state.rows.length === 1 ? "transaction" : "transactions"}
+            </span>
           </div>
-          <div className="table-scroll" role="region" aria-label="Recent transaction details" tabIndex={0}>
-            <table className="transactions-table">
-              <thead>
-                <tr>
-                  <th scope="col">Provider</th>
-                  <th scope="col">Endpoint / query type</th>
-                  <th scope="col" className="align-right">Price · USD</th>
-                  <th scope="col">State</th>
-                  <th scope="col">Tempo receipts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.rows.map(row => (
-                  <tr key={row.id} className={row.fresh ? "fresh-payment" : undefined}>
-                    <td>{row.provider}</td>
-                    <td className="endpoint-cell">
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="Recent transaction details"
+            tabIndex={0}
+          >
+            <Table className="transactions-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Provider</TableHead>
+                  <TableHead scope="col">Endpoint / query type</TableHead>
+                  <TableHead scope="col" className="align-right">
+                    Price · USD
+                  </TableHead>
+                  <TableHead scope="col">State</TableHead>
+                  <TableHead scope="col">Tempo receipts</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {state.rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className={row.fresh ? "fresh-payment" : undefined}
+                  >
+                    <TableCell>{row.provider}</TableCell>
+                    <TableCell className="endpoint-cell">
                       <span>{row.service}</span>
                       <code>{row.endpointId}</code>
-                    </td>
-                    <td className="align-right">
+                    </TableCell>
+                    <TableCell className="align-right">
                       {row.charged === null ? "Pending" : money(row.charged)}
-                    </td>
-                    <td>
-                      <span className={`status status-${row.statusKey}`}>{row.status}</span>
-                    </td>
-                    <td className="receipt-cell">
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`status status-${row.statusKey}`}>
+                        {row.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="receipt-cell">
                       {row.incoming ? (
                         <a
                           href={row.incoming.url}
@@ -338,7 +450,8 @@ export default function Demo() {
                           rel="noreferrer"
                           title={row.incoming.reference}
                         >
-                          Claude to OpenMCP · {shortReference(row.incoming.reference)}
+                          Claude to OpenMCP ·{" "}
+                          {shortReference(row.incoming.reference)}
                         </a>
                       ) : (
                         <span>Claude receipt pending</span>
@@ -350,26 +463,27 @@ export default function Demo() {
                           rel="noreferrer"
                           title={row.outgoing.reference}
                         >
-                          OpenMCP to provider · {shortReference(row.outgoing.reference)}
+                          OpenMCP to provider ·{" "}
+                          {shortReference(row.outgoing.reference)}
                         </a>
                       ) : (
                         <span>Provider receipt pending</span>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {state.rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="empty-state">
-                      No session transactions yet. Purchases made by Claude appear here with their
-                      Tempo receipts.
-                    </td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={5} className="empty-state">
+                      No session transactions yet. Purchases made by Claude
+                      appear here with their Tempo receipts.
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </section>
+        </Card>
       </main>
     </div>
   );

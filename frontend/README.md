@@ -99,6 +99,54 @@ Open http://localhost:3000. The landing page is at `/`, the live FreightFlow dem
 
 ## Design
 
+Shared UI now comes from [shadcn/ui](https://ui.shadcn.com/docs), using its
+Radix components (the `new-york` registry), Tailwind CSS v4, and Lucide icons.
+The source lives in `src/components/ui`; `components.json` configures future
+registry additions. These are locally owned components, customized for OpenMCP.
+
+| Previous shared UI | Replacement | Where used |
+| --- | --- | --- |
+| Buttons and link-shaped actions | Button, with primary, outline, ghost, and link variants | Landing, account, demo, providers |
+| Native inputs and selects | Input, Label, Select | Top-ups, agents, budget, transaction/provider filters |
+| Hand-built audience switch | Tabs | Landing page |
+| Amount presets and status filters | Toggle Group | Top-ups and provider payments |
+| Native dialogs | Dialog | Top-ups, agent creation/keys, payment details |
+| Workspace quick navigation | Command + Dialog | Dashboard page switcher (⌘/Ctrl K) |
+| Panels and status pills | Card, Badge, Alert | All workspaces |
+| Tables and paging controls | Table, Pagination | Account, observer, provider history |
+| Allowance/payment split bars | Progress | Agents and provider overview |
+| Hand-built earnings chart | Chart with Recharts BarChart | Provider overview |
+| Notifications, tooltips, loading, empty states | Sonner, Tooltip, Skeleton, Empty | Shared feedback and workspaces |
+| Initials, breadcrumbs, dividers | Avatar, Breadcrumb, Separator | Workspace shells and observer |
+
+`src/app/ui-theme.css` maps shadcn's semantic colors to the original warm paper,
+ink, lavender, and violet palette. Figtree, Geist Mono, the temple artwork, page
+layouts, and spacing remain. Tailwind's theme and utilities are loaded without
+Preflight so the existing editorial typography is preserved. Page CSS owns
+layout; shared components own control behavior and defaults. The existing
+Magic UI number tickers remain the animated-number primitive.
+
+The session budget also has an exact-cent Slider, linked to the amount input.
+Changing it only edits the draft; Apply still starts the new session. Dialogs
+restore focus to their opener, including when controlled without a trigger,
+and busy account dialogs cannot be dismissed during an in-flight request.
+
+Controls use restrained 3–8px corners and neutral keyboard focus indicators.
+Inputs use an ink border rather than a colored halo. Landing audience panels
+stay mounted in the same grid cell to prevent layout jumps; the inactive panel
+is invisible, inert, and hidden from assistive technology. Top-ups use a flat,
+receipt-like summary; outside clicks and Escape dismiss idle dialogs.
+
+In development, visit **http://localhost:3000/design-system** to try the shared
+components and actual top-up dialog. It is a UI-only playground: its checkout
+callback displays a preview notification and makes no API request. The route
+returns 404 in production. Live account pages retain their existing Clerk and
+backend requirements; observers still report an offline stack honestly.
+
+To add another primitive, run `npx shadcn@latest add <component>` from `frontend/`,
+then adapt it to the existing tokens and use `@/lib/utils` for `cn`. Review any
+registry overwrite carefully to retain the OpenMCP customizations.
+
 The original Figtree and Geist Mono fonts are self-hosted in `public/fonts`. The supplied temple image is in `public/images`. Desktop dimensions, copy, colors, and typography follow the reference; tablet and phone layouts adapt without horizontal page overflow.
 
 Live balances, earnings, and payment counts use [Magic UI Number Ticker](https://magicui.design/docs/components/number-ticker), adapted in `src/components/ui/number-ticker.tsx` and `src/components/magicui/number-ticker.tsx` with Motion springs. Changes animate from the current value in either direction, currency values retain two decimals, and reduced-motion preferences display the final value immediately. Screen readers receive the actual target value rather than intermediate animation frames. Receipt amounts remain static.
@@ -114,6 +162,27 @@ Provider and date filters scope earnings, charts, and payments. Payment history 
 This remains a local operator workspace, with visibility into all configured providers. It is not a multi-tenant provider login. Historical reporting currently reads the complete local ledger; larger deployments will need server pagination and provider-scoped authorization.
 
 The landing page keeps the original visual style and uses a horizontal “For agents / For APIs” switch to show audience-specific value propositions. Section links select the corresponding audience; the service-registration CTA scrolls to the API view. The switch supports arrow keys, Home/End, and reduced-motion preferences.
+
+## Account dashboard
+
+`/dashboard` uses a compact, Stripe-inspired workspace: a current-balance
+snapshot, 7/30-day spending chart, agent allowances, and a searchable recent
+ledger. Shared navigation includes a shadcn Command page switcher (⌘/Ctrl K).
+Typography and the paper/ink/lavender palette remain OpenMCP's own.
+
+The home page reads the latest 100 transactions and up to 100 agents from the
+existing account API. Chart totals include only completed purchases, in integer
+cents and local calendar days. Pending, failed, and refunded purchases are
+excluded. A truncated date range is explicitly marked as partial history, and
+paginated agent counts are marked as lower bounds. All-time wallet totals come
+directly from the wallet API, not a sampled transaction page. Errors show
+unavailable values, never fabricated zero balances.
+
+`/design-system/dashboard` is a development-only preview of the same frame and
+overview components with clearly labeled illustrative data. It includes active,
+new, payment-review, offline, and partial-history states. Preview checkout and
+transaction details are read-only simulations; links to account management
+still require the configured account backend. The route returns 404 in production.
 
 ## Checks
 

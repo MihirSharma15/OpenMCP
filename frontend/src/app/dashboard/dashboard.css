@@ -1,0 +1,197 @@
+/* A quieter, information-first workspace. Scoped so the landing page stays editorial. */
+.dashboard-app { background: #fff; color: var(--ink); }
+.dashboard-app .account-sidebar { width: 216px; padding: 26px 14px 20px; background: #f7f7f4; height: 100dvh; }
+.dashboard-wordmark { padding: 0 10px; font-size: 21px; gap: 9px; }
+.dashboard-app .account-brand-mark { width: 24px; height: 24px; font-size: 19px; border-radius: 4px; }
+.dashboard-workspace { display: flex; align-items: center; gap: 10px; padding: 31px 11px 26px; font-size: 12px; font-weight: 500; }
+.dashboard-workspace small { display: block; color: var(--muted); font-weight: 400; font-size: 10px; margin-top: 5px; }
+.dashboard-workspace-icon { display: grid; place-items: center; width: 29px; height: 29px; background: #eae7f3; color: var(--violet); border-radius: 4px; }
+.dashboard-app .account-sidebar nav { gap: 4px; }
+.dashboard-app .account-sidebar nav a { gap: 10px; padding: 10px 12px; font-size: 12px; border-radius: 4px; color: #605f5b; }
+.dashboard-app .account-sidebar nav a.active { background: #ebe8f5; color: #554b88; font-weight: 500; }
+.dashboard-app .account-sidebar nav a:hover { background: #efeeeb; }
+.dashboard-app .account-sidebar nav a.active:hover { background: #e6e2f1; color: #554b88; }
+.dashboard-nav-label { margin: 29px 12px 10px; color: #8a8882; font: 9px var(--font-mono); letter-spacing: 1px; }
+.dashboard-sidebar-bottom { margin-top: auto; padding: 30px 12px 0; }
+.dashboard-sidebar-bottom > a { display: flex; align-items: center; gap: 8px; color: #67645e; font-size: 11px; }
+.dashboard-sidebar-bottom > a > svg:last-child { margin-left: auto; }
+.dashboard-workspace-footer { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #8a8882; margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--line); }
+.dashboard-app .account-topbar { height: 64px; padding: 0 34px; gap: 24px; background: #fff; }
+.dashboard-breadcrumb { display: flex; align-items: center; gap: 13px; font-size: 11px; }
+.dashboard-breadcrumb > span { color: #c5c2bc; }
+.dashboard-breadcrumb > strong { font-weight: 400; color: var(--ink); }
+.dashboard-jump { justify-content: flex-start; gap: 9px; margin-left: auto; width: 260px; height: 32px; padding: 0 9px; font-size: 11px; color: #8a8782; }
+.dashboard-jump:hover { background: #f7f7f4; color: var(--ink); }
+.dashboard-jump kbd { margin-left: auto; color: #98948d; border: 1px solid var(--line); border-radius: 3px; font: 9px var(--font-mono); padding: 3px 4px; }
+.dashboard-topbar-end { display: flex; align-items: center; gap: 16px; }
+.dashboard-mode { border-radius: 3px; padding: 3px 7px; font-size: 10px; color: #746951; background: #faf7ee; border-color: #ede5d3; font-weight: 400; }
+.dashboard-app .account-main { max-width: 1320px; padding: 35px 34px 52px; }
+.dashboard-app .account-page-heading { margin-bottom: 30px; }
+.dashboard-app .account-page-heading h1 { font-size: 27px; font-weight: 500; margin: 0 0 7px; letter-spacing: -.8px; }
+.dashboard-app .account-page-heading p { font-size: 12px; line-height: 20px; }
+.dashboard-app .account-test-notice { margin: 0 0 24px; padding: 8px 12px; background: #fcfaf4; color: #86703f; border-color: #eee7d7; border-radius: 3px; }
+.dashboard-heading-actions { display: flex; align-items: center; gap: 12px; }
+.dashboard-heading-actions [data-slot="button"] { height: 33px; font-size: 12px; padding: 0 12px; }
+.dashboard-heading-actions [data-variant="ghost"] { color: var(--muted); }
+.dashboard-metrics { display: grid; grid-template-columns: 1.18fr 1fr 1fr 1fr; padding: 2px 0 28px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+.dashboard-metric { padding: 0 22px; border-left: 1px solid #eeede9; }
+.dashboard-metric:first-child { padding-left: 0; border: 0; }
+.dashboard-metric:last-child { padding-right: 0; }
+.dashboard-metric-label { display: flex; align-items: center; gap: 5px; color: #66635e; height: 25px; font-size: 12px; }
+.dashboard-metric-label [data-slot="button"] { width: 21px; height: 21px; color: #aaa69e; }
+.dashboard-metric > strong { display: block; font-size: clamp(26px, 2.65vw, 37px); line-height: 1.2; margin: 7px 0 8px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: -1.2px; }
+.dashboard-metric.is-primary > strong { color: #554981; }
+.dashboard-metric > span { font-size: 10px; line-height: 17px; color: #89857e; }
+.dashboard-insights { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(290px, 1fr); gap: 22px; margin-bottom: 28px; }
+.dashboard-spending, .dashboard-agents, .dashboard-activity { border-radius: 5px; box-shadow: none; background: white; }
+.dashboard-spending, .dashboard-agents { padding: 21px 22px 17px; min-height: 382px; }
+.dashboard-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.dashboard-section-heading h2 { font-size: 15px; line-height: 22px; font-weight: 500; letter-spacing: -.2px; }
+.dashboard-section-heading [data-slot="button"] { font-size: 11px; }
+.dashboard-section-subtitle { color: var(--muted); font-size: 11px; line-height: 18px; margin-top: 5px; }
+.dashboard-period { padding: 2px; border: 1px solid var(--line); background: #f9f9f6; border-radius: 4px; }
+.dashboard-period [data-slot="toggle-group-item"] { font-size: 10px; height: 24px; min-width: 0; border: 0; padding: 0 10px; background: transparent; color: var(--muted); border-radius: 2px; }
+.dashboard-period [data-state="on"], .dashboard-period [data-state="on"]:hover { background: white; color: var(--ink); box-shadow: 0 1px 3px #16151415; }
+.dashboard-chart-stat { display: flex; align-items: center; gap: 15px; margin: 25px 0 18px; }
+.dashboard-chart-stat > strong { font-size: 30px; font-weight: 400; letter-spacing: -.9px; font-variant-numeric: tabular-nums; }
+.dashboard-chart-stat > div { display: flex; flex-direction: column; gap: 5px; }
+.dashboard-chart-stat span { color: #64605a; font-size: 11px; }
+.dashboard-chart-stat small { color: #969087; font-size: 10px; }
+.dashboard-chart { height: 182px; width: 100%; aspect-ratio: auto; font-size: 10px; }
+.dashboard-chart-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; font-size: 9px; line-height: 15px; color: #969087; }
+.dashboard-chart-note > span:first-child { display: flex; align-items: center; gap: 6px; color: #68625d; }
+.dashboard-chart-note i { width: 6px; height: 6px; border-radius: 1px; background: var(--violet); }
+.dashboard-partial { margin-top: 15px; font-size: 11px; line-height: 18px; color: #8c6f30; }
+.dashboard-partial a { display: inline-flex; align-items: center; color: inherit; text-decoration: underline; }
+.dashboard-agent-list { margin-top: 19px; }
+.dashboard-agent-row { padding: 13px 0 15px; }
+.dashboard-agent-row + .dashboard-agent-row { border-top: 1px solid #efede8; }
+.dashboard-agent-title { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.dashboard-agent-title > svg { color: #8a7ca8; flex-shrink: 0; }
+.dashboard-agent-title > a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.dashboard-agent-title [data-slot="badge"] { margin-left: auto; font-size: 9px; padding: 0 6px; line-height: 17px; border-radius: 3px; }
+.dashboard-agent-amount { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin: 10px 0 8px; font-size: 10px; color: #969087; }
+.dashboard-agent-amount strong { font-weight: 500; font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dashboard-agent-amount strong span { color: var(--muted); font-weight: 400; font-size: 10px; }
+.dashboard-agent-row [data-slot="progress"] { height: 3px; border-radius: 1px; background: #eeecf3; }
+.dashboard-agent-row [data-slot="progress-indicator"] { background: #aaa0cf; }
+.dashboard-agent-footer { display: flex; align-items: flex-start; gap: 7px; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 14px; color: #969087; font-size: 10px; line-height: 16px; }
+.dashboard-agent-footer > svg { flex-shrink: 0; margin-top: 1px; }
+.dashboard-no-agents { min-height: 230px; display: flex; align-items: flex-start; justify-content: center; flex-direction: column; gap: 12px; color: #8a7ca8; }
+.dashboard-no-agents h3 { color: var(--ink); font-size: 14px; font-weight: 400; }
+.dashboard-no-agents p { color: var(--muted); font-size: 12px; line-height: 20px; max-width: 220px; }
+.dashboard-no-agents [data-slot="button"] { margin-top: 3px; }
+.dashboard-activity { overflow: hidden; scroll-margin-top: 24px; }
+.dashboard-activity > .dashboard-section-heading { padding: 22px 22px 16px; }
+.dashboard-activity-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 0 22px; margin-bottom: 10px; }
+.dashboard-activity-toolbar [data-slot="tabs-list"] { padding: 0; gap: 22px; height: 38px; }
+.dashboard-activity-toolbar [data-slot="tabs-trigger"] { padding: 0; border: 0; font-size: 11px; height: 38px; flex: initial; color: #92908a; }
+.dashboard-activity-toolbar [data-slot="tabs-trigger"][data-state="active"] { color: var(--violet); }
+.dashboard-activity-toolbar [data-slot="tabs-trigger"]::after { height: 2px; bottom: 0; background: var(--violet); }
+.dashboard-activity-search { display: flex; align-items: center; gap: 8px; width: 194px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 3px; color: #969087; }
+.dashboard-activity-search:focus-within { border-color: var(--ink); }
+.dashboard-activity-search > svg { flex-shrink: 0; }
+.dashboard-activity-search [data-slot="input"] { font-size: 11px; min-width: 0; border-radius: 0; }
+.dashboard-app .account-table th { font-size: 10px; background: #fbfbf9; padding-top: 10px; padding-bottom: 10px; }
+.dashboard-app .account-table td { padding-top: 13px; padding-bottom: 13px; }
+.dashboard-app .account-transaction-icon { height: 26px; width: 26px; font-size: 15px; background: #f4f2f7; color: #84789c; border-radius: 4px; }
+.dashboard-app .account-transaction-icon.type-deposit, .dashboard-app .account-transaction-icon.type-refund { background: #eff3eb; color: #5a7851; }
+.dashboard-app .account-transaction-name strong { font-size: 11px; max-width: 270px; }
+.dashboard-app .account-status { font-size: 9px; border-radius: 3px; padding: 1px 7px; }
+.dashboard-app .account-number { font-size: 12px; }
+.dashboard-app .account-date { font-size: 10px; }
+.dashboard-activity-footer { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 13px 22px; border-top: 1px solid var(--line); color: #969087; font-size: 10px; }
+.dashboard-activity-footer [data-slot="button"] { height: 24px; font-size: 10px; }
+.dashboard-attention { display: flex; align-items: center; gap: 12px; padding: 15px 18px; background: #fcf8ee; border: 1px solid #eae0c9; border-radius: 4px; margin-bottom: 22px; color: #89703a; }
+.dashboard-attention > svg { flex-shrink: 0; }
+.dashboard-attention > div { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 11px; line-height: 17px; }
+.dashboard-attention strong { font-size: 12px; font-weight: 500; color: #685123; }
+.dashboard-attention [data-slot="button"] { font-size: 11px; flex-shrink: 0; background: #fffdf8; }
+.dashboard-onboarding { display: flex; align-items: center; gap: 25px; justify-content: space-between; margin-bottom: 25px; padding: 21px; border: 1px solid var(--line); background: #fafaf7; border-radius: 4px; }
+.dashboard-kicker { font: 9px var(--font-mono); letter-spacing: .8px; color: #9a9388; }
+.dashboard-onboarding h2 { font-size: 16px; line-height: 24px; margin-top: 7px; }
+.dashboard-setup-steps { display: flex; flex-wrap: wrap; gap: 8px; }
+.dashboard-setup-steps [data-slot="button"] { font-size: 11px; padding: 0 8px; }
+.dashboard-setup-steps [data-slot="button"] > span { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid #dcd7e6; border-radius: 50%; font: 10px var(--font-mono); color: #86759c; }
+.dashboard-app .account-footer { padding: 18px 34px; font-size: 9px; color: #9d968b; }
+.dashboard-preview-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px dashed #c9c3d5; border-radius: 4px; background: #f8f6fc; margin-bottom: 28px; color: #7c7293; font-size: 11px; }
+.dashboard-preview-toolbar > span > strong { color: #594d73; font-weight: 500; }
+.dashboard-preview-toolbar [data-slot="toggle-group-item"] { font-size: 10px; height: 27px; }
+[data-slot="command-input"] { font-family: inherit; }
+[data-slot="command-input-wrapper"] { border-bottom-style: solid; }
+@media (max-width: 1150px) {
+  .dashboard-app .account-sidebar { width: 195px; }
+  .dashboard-app .account-main { padding: 30px 24px 40px; }
+  .dashboard-app .account-topbar { padding: 0 24px; }
+  .dashboard-insights { gap: 16px; grid-template-columns: minmax(0, 1.5fr) minmax(255px, 1fr); }
+  .dashboard-spending, .dashboard-agents { padding: 18px; }
+  .dashboard-metric { padding: 0 15px; }
+  .dashboard-chart-note { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .dashboard-onboarding { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+@media (max-width: 900px) {
+  .dashboard-app .account-sidebar { width: 180px; padding-left: 10px; padding-right: 10px; }
+  .dashboard-workspace { padding-left: 5px; gap: 7px; }
+  .dashboard-workspace-icon { display: none; }
+  .dashboard-insights { grid-template-columns: 1fr; }
+  .dashboard-agent-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
+  .dashboard-agent-row + .dashboard-agent-row { border-top: 0; }
+  .dashboard-agent-title { flex-wrap: wrap; }
+  .dashboard-agent-title [data-slot="badge"] { display: none; }
+  .dashboard-agent-title > a { flex: 1; }
+  .dashboard-metrics { grid-template-columns: repeat(2, 1fr); row-gap: 25px; }
+  .dashboard-metric:nth-child(3) { border: 0; padding-left: 0; }
+  .dashboard-chart-note { flex-direction: row; }
+  .dashboard-jump { width: 34px; padding: 0; justify-content: center; }
+  .dashboard-jump > span, .dashboard-jump kbd { display: none; }
+  .dashboard-activity-toolbar { flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+  .dashboard-activity-search { width: 100%; }
+}
+@media (max-width: 760px) {
+  .dashboard-app { display: block; }
+  .dashboard-app .account-sidebar { position: static; width: 100%; height: auto; padding: 17px 20px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .dashboard-wordmark { padding: 0; font-size: 20px; }
+  .dashboard-workspace, .dashboard-nav-label, .dashboard-sidebar-bottom, .dashboard-app nav[aria-label="Workspace tools"] { display: none; }
+  .dashboard-app .account-sidebar nav[aria-label="Account"] { display: flex; margin: 16px -6px 0; gap: 14px; }
+  .dashboard-app .account-sidebar nav a { padding: 12px 6px; border-radius: 0; font-size: 12px; flex: initial; }
+  .dashboard-app .account-sidebar nav a.active { background: none; box-shadow: inset 0 -2px var(--violet); }
+  .dashboard-app .account-topbar { height: 49px; padding: 0 20px; gap: 8px; }
+  .dashboard-topbar-end { gap: 10px; }
+  .dashboard-app .account-main { padding: 26px 20px 36px; }
+  .dashboard-app .account-page-heading { align-items: center; flex-direction: row; gap: 12px; }
+  .dashboard-app .account-page-heading h1 { font-size: 26px; }
+  .dashboard-heading-actions { gap: 4px; }
+  .dashboard-heading-actions [data-variant="ghost"] > span { display: none; }
+  .dashboard-heading-actions [data-variant="ghost"] { padding: 0 7px; }
+  .dashboard-metric > strong { font-size: 30px; }
+  .dashboard-metric > span { font-size: 9px; }
+  .dashboard-spending, .dashboard-agents { padding: 18px 16px; }
+  .dashboard-agent-list { display: block; }
+  .dashboard-agent-row + .dashboard-agent-row { border-top: 1px solid #efede8; }
+  .dashboard-agent-title [data-slot="badge"] { display: inline-flex; }
+  .dashboard-chart-note { flex-direction: column; align-items: flex-start; }
+  .dashboard-activity > .dashboard-section-heading { padding: 18px 16px 14px; }
+  .dashboard-activity-toolbar { padding: 0 16px; }
+  .dashboard-activity-toolbar [data-slot="tabs-list"] { gap: 18px; }
+  .dashboard-activity-toolbar [data-slot="tabs-trigger"] { font-size: 10px; }
+  .dashboard-activity-footer { padding: 12px 16px; flex-wrap: wrap; font-size: 9px; }
+  .dashboard-activity-footer > span:last-child { display: none; }
+  .dashboard-app .account-table th:nth-child(2), .dashboard-app .account-table td:nth-child(2), .dashboard-app .account-table th:nth-child(3), .dashboard-app .account-table td:nth-child(3) { display: none; }
+  .dashboard-app .account-table { table-layout: fixed; }
+  .dashboard-app .account-table th:first-child, .dashboard-app .account-table td:first-child { padding-left: 14px; padding-right: 4px; white-space: normal; }
+  .dashboard-app .account-table th:nth-child(4), .dashboard-app .account-table td:nth-child(4) { width: 74px; padding-left: 4px; padding-right: 4px; }
+  .dashboard-app .account-table th:last-child, .dashboard-app .account-table td:last-child { width: 38px; padding-left: 0; padding-right: 8px; }
+  .dashboard-app .account-transaction-name { min-width: 0; gap: 7px; align-items: flex-start; }
+  .dashboard-app .account-transaction-name > div { min-width: 0; }
+  .dashboard-app .account-transaction-name strong { max-width: none; font-size: 11px; line-height: 16px; }
+  .dashboard-app .account-transaction-icon { width: 22px; height: 22px; font-size: 13px; margin-top: 1px; }
+  .dashboard-app .account-transaction-name span:not(.account-transaction-icon) { font-size: 9px; line-height: 14px; margin-top: 3px; }
+  .dashboard-app .account-transaction-mobile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+  .dashboard-app .account-transaction-mobile-meta [data-slot="badge"] { margin: 0; font-size: 8px; line-height: 13px; padding: 0 4px; }
+  .dashboard-app .account-transaction-mobile-meta time { font-size: 9px; color: #9b9488; }
+  .dashboard-app .account-table td:last-child [data-slot="button"] { width: 28px; height: 28px; }
+  .dashboard-attention { flex-wrap: wrap; padding: 14px; }
+  .dashboard-attention > div { min-width: 200px; }
+  .dashboard-app .account-footer { padding: 18px 20px; }
+  .dashboard-preview-toolbar { align-items: flex-start; flex-direction: column; font-size: 10px; }
+}
